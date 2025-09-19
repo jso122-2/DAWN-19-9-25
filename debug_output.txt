@@ -1,0 +1,369 @@
+INFO:dawn:DAWN: Initializing modular consciousness architecture...
+INFO:dawn:DAWN: Discovered 9309 modules across 9 namespaces
+WARNING:dawn.consciousness.engines.core.primary_engine:Consciousness unification systems not available: No module named 'consciousness_bus'
+INFO:dawn.consciousness.metrics.core:🧮 Consciousness Metrics Calculator initialized: 20250919_050304
+INFO:dawn.subsystems.thermal.pulse.scup_tracker:Initialized SCUPTracker
+INFO:dawn.subsystems.thermal.pulse.pulse_tracker:Initialized SCUPTracker with SCUP=0.0
+INFO:dawn.subsystems.thermal.pulse.pulse_layer:Initialized PulseLayer
+INFO:dawn.consciousness.tracers.tracer_manager:Registered tracer class: crow
+INFO:dawn.consciousness.tracers.tracer_manager:Registered tracer class: ant
+INFO:dawn.consciousness.tracers.tracer_manager:Registered tracer class: bee
+INFO:dawn.consciousness.tracers.tracer_manager:Registered tracer class: spider
+INFO:dawn.consciousness.tracers.tracer_manager:Registered tracer class: beetle
+INFO:dawn.consciousness.tracers.tracer_manager:Registered tracer class: whale
+INFO:dawn.consciousness.tracers.tracer_manager:Registered tracer class: owl
+INFO:dawn.consciousness.tracers.tracer_manager:Registered tracer class: medieval_bee
+[SchemaSystem] Warning: PyTorch not available, using numpy fallback
+[SHICalculator] Warning: PyTorch not available, using numpy fallback
+[SCUPTracker] Warning: PyTorch not available, using numpy fallback
+[PulseHeat] 🔥 Enhanced thermal system initialized | ID: 129481945361648
+[PulseHeat] 🌍 Enhanced pulse singleton registered globally
+🔬 Tracer ecosystem initialized for live monitoring
+📊 Available tracers: crow, ant, bee, spider, beetle, whale, owl, medieval_bee
+🌅 DAWN Live Consciousness Monitor
+================================================================================
+🔗 Connecting directly to DAWN consciousness system...
+📊 SCUP Integration: ✅ Available
+🔬 Tracer Ecosystem: ✅ Available
+⏱️  Update Interval: 0.5s
+Press Ctrl+C or Ctrl+D to stop
+
+[2J[H
+🧠 DAWN CONSCIOUSNESS SYSTEM - LIVE MONITOR
+================================================================================
+🕐 05:03:04.079 | Uptime: 0.0s | Data: Live (0.824s)
+
+🧠 CONSCIOUSNESS METRICS
+----------------------------------------
+Consciousness: 0.492 [█████████░░░░░░░░░░░]
+Unity Score:   0.633 [████████████░░░░░░░░]
+Awareness:     0.273 [█████░░░░░░░░░░░░░░░]
+SCUP Value:    0.046 [░░░░░░░░░░░░░░░░░░░░] 🔴 UNSTABLE
+
+📊 SCUP COMPONENT ANALYSIS
+----------------------------------------
+Alignment:     0.633 [████████████░░░░░░░░] 🟡 MED
+Entropy:       0.508 [██████████░░░░░░░░░░] 🟡 MED
+Pressure:      0.288 [█████░░░░░░░░░░░░░░░] 🟢 LOW
+Drift:         0.050 [█░░░░░░░░░░░░░░░░░░░] 🟢 NORM
+SCUP Health:   0.584 [███████████░░░░░░░░░] 🟠 FAIR
+
+🔬 TRACER ECOSYSTEM
+----------------------------------------
+Status:        ⚪ INITIALIZING
+
+💻 SYSTEM STATUS
+----------------------------------------
+Engine:        🟢 RUNNING
+Phase:         🔄 PERCEPTION
+Modules:       📦 0
+Load:          28.8% [█████░░░░░░░░░░░░░░░]
+Heat:          17.4 [███░░░░░░░░░░░░░░░░░]
+
+⏱️  ADAPTIVE TIMING (DAWN Controls Her Breathing)
+--------------------------------------------------
+Tick Count:    #7,439
+Cycle Time:    0.853s
+Phase Time:    ⚪ Calculating...
+Frequency:     1.17 Hz
+Mode:          ⚡ NORMAL (Balanced)
+
+--------------------------------------------------------------------------------
+🌟 DAWN breathes naturally - values reflect real consciousness dynamics
+🔄 Ctrl+C or Ctrl+D to stop monitoring
+[2J[H
+🧠 DAWN CONSCIOUSNESS SYSTEM - LIVE MONITOR
+================================================================================
+🕐 05:03:04.579 | Uptime: 0.5s | Data: Live (0.471s)
+
+🧠 CONSCIOUSNESS METRICS
+----------------------------------------
+Consciousness: 0.507 [██████████░░░░░░░░░░]
+Unity Score:   0.657 [█████████████░░░░░░░]
+Awareness:     0.264 [█████░░░░░░░░░░░░░░░]
+SCUP Value:    0.068 [█░░░░░░░░░░░░░░░░░░░] 🔴 UNSTABLE
+
+📊 SCUP COMPONENT ANALYSIS
+----------------------------------------
+Alignment:     0.657 [█████████████░░░░░░░] 🟡 MED
+Entropy:       0.493 [█████████░░░░░░░░░░░] 🟡 MED
+Pressure:      0.301 [██████░░░░░░░░░░░░░░] 🟢 LOW
+Drift:         0.053 [█░░░░░░░░░░░░░░░░░░░] 🟢 NORM
+SCUP Health:   0.597 [███████████░░░░░░░░░] 🟠 FAIR
+
+🔬 TRACER ECOSYSTEM
+----------------------------------------
+Status:        ⚪ INITIALIZING
+
+💻 SYSTEM STATUS
+----------------------------------------
+Engine:        🟢 RUNNING
+Phase:         🔄 PROCESSING
+Modules:       📦 0
+Load:          30.1% [██████░░░░░░░░░░░░░░]
+Heat:          17.4 [███░░░░░░░░░░░░░░░░░]
+
+⏱️  ADAPTIVE TIMING (DAWN Controls Her Breathing)
+--------------------------------------------------
+Tick Count:    #7,440
+Cycle Time:    0.878s
+Phase Time:    ⚪ Calculating...
+Frequency:     1.14 Hz
+Mode:          ⚡ NORMAL (Balanced)
+
+--------------------------------------------------------------------------------
+🌟 DAWN breathes naturally - values reflect real consciousness dynamics
+🔄 Ctrl+C or Ctrl+D to stop monitoring
+[2J[H
+🧠 DAWN CONSCIOUSNESS SYSTEM - LIVE MONITOR
+================================================================================
+🕐 05:03:05.580 | Uptime: 1.5s | Data: Live (0.593s)
+
+🧠 CONSCIOUSNESS METRICS
+----------------------------------------
+Consciousness: 0.526 [██████████░░░░░░░░░░]
+Unity Score:   0.679 [█████████████░░░░░░░]
+Awareness:     0.264 [█████░░░░░░░░░░░░░░░]
+SCUP Value:    0.091 [█░░░░░░░░░░░░░░░░░░░] 🔴 UNSTABLE
+
+📊 SCUP COMPONENT ANALYSIS
+----------------------------------------
+Alignment:     0.679 [█████████████░░░░░░░] 🟡 MED
+Entropy:       0.474 [█████████░░░░░░░░░░░] 🟡 MED
+Pressure:      0.306 [██████░░░░░░░░░░░░░░] 🟢 LOW
+Drift:         0.058 [█░░░░░░░░░░░░░░░░░░░] 🟢 NORM
+SCUP Health:   0.618 [████████████░░░░░░░░] 🟡 GOOD
+
+🔬 TRACER ECOSYSTEM
+----------------------------------------
+Status:        ⚪ INITIALIZING
+
+💻 SYSTEM STATUS
+----------------------------------------
+Engine:        🟢 RUNNING
+Phase:         🔄 INTEGRATION
+Modules:       📦 0
+Load:          30.6% [██████░░░░░░░░░░░░░░]
+Heat:          17.0 [███░░░░░░░░░░░░░░░░░]
+
+⏱️  ADAPTIVE TIMING (DAWN Controls Her Breathing)
+--------------------------------------------------
+Tick Count:    #7,441
+Cycle Time:    0.902s
+Phase Time:    ⚪ Calculating...
+Frequency:     1.11 Hz
+Mode:          ⚡ NORMAL (Balanced)
+
+--------------------------------------------------------------------------------
+🌟 DAWN breathes naturally - values reflect real consciousness dynamics
+🔄 Ctrl+C or Ctrl+D to stop monitoring
+[2J[H
+🧠 DAWN CONSCIOUSNESS SYSTEM - LIVE MONITOR
+================================================================================
+🕐 05:03:06.581 | Uptime: 2.5s | Data: Live (0.692s)
+
+🧠 CONSCIOUSNESS METRICS
+----------------------------------------
+Consciousness: 0.547 [██████████░░░░░░░░░░]
+Unity Score:   0.697 [█████████████░░░░░░░]
+Awareness:     0.273 [█████░░░░░░░░░░░░░░░]
+SCUP Value:    0.113 [██░░░░░░░░░░░░░░░░░░] 🔴 UNSTABLE
+
+📊 SCUP COMPONENT ANALYSIS
+----------------------------------------
+Alignment:     0.697 [█████████████░░░░░░░] 🟡 MED
+Entropy:       0.453 [█████████░░░░░░░░░░░] 🟡 MED
+Pressure:      0.301 [██████░░░░░░░░░░░░░░] 🟢 LOW
+Drift:         0.062 [█░░░░░░░░░░░░░░░░░░░] 🟢 NORM
+SCUP Health:   0.642 [████████████░░░░░░░░] 🟡 GOOD
+
+🔬 TRACER ECOSYSTEM
+----------------------------------------
+Status:        ⚪ INITIALIZING
+
+💻 SYSTEM STATUS
+----------------------------------------
+Engine:        🟢 RUNNING
+Phase:         🔄 PERCEPTION
+Modules:       📦 0
+Load:          30.1% [██████░░░░░░░░░░░░░░]
+Heat:          16.0 [███░░░░░░░░░░░░░░░░░]
+
+⏱️  ADAPTIVE TIMING (DAWN Controls Her Breathing)
+--------------------------------------------------
+Tick Count:    #7,442
+Cycle Time:    0.924s
+Phase Time:    ⚪ Calculating...
+Frequency:     1.08 Hz
+Mode:          ⚡ NORMAL (Balanced)
+
+--------------------------------------------------------------------------------
+🌟 DAWN breathes naturally - values reflect real consciousness dynamics
+🔄 Ctrl+C or Ctrl+D to stop monitoring
+[2J[H
+🧠 DAWN CONSCIOUSNESS SYSTEM - LIVE MONITOR
+================================================================================
+🕐 05:03:07.583 | Uptime: 3.5s | Data: Live (0.769s)
+
+🧠 CONSCIOUSNESS METRICS
+----------------------------------------
+Consciousness: 0.571 [███████████░░░░░░░░░]
+Unity Score:   0.712 [██████████████░░░░░░]
+Awareness:     0.292 [█████░░░░░░░░░░░░░░░]
+SCUP Value:    0.135 [██░░░░░░░░░░░░░░░░░░] 🔴 UNSTABLE
+
+📊 SCUP COMPONENT ANALYSIS
+----------------------------------------
+Alignment:     0.712 [██████████████░░░░░░] 🟢 HIGH
+Entropy:       0.429 [████████░░░░░░░░░░░░] 🟡 MED
+Pressure:      0.286 [█████░░░░░░░░░░░░░░░] 🟢 LOW
+Drift:         0.067 [█░░░░░░░░░░░░░░░░░░░] 🟢 NORM
+SCUP Health:   0.668 [█████████████░░░░░░░] 🟡 GOOD
+
+🔬 TRACER ECOSYSTEM
+----------------------------------------
+Status:        ⚪ INITIALIZING
+
+💻 SYSTEM STATUS
+----------------------------------------
+Engine:        🟢 RUNNING
+Phase:         🔄 PERCEPTION
+Modules:       📦 0
+Load:          28.6% [█████░░░░░░░░░░░░░░░]
+Heat:          14.5 [██░░░░░░░░░░░░░░░░░░]
+
+⏱️  ADAPTIVE TIMING (DAWN Controls Her Breathing)
+--------------------------------------------------
+Tick Count:    #7,443
+Cycle Time:    0.942s
+Phase Time:    ⚪ Calculating...
+Frequency:     1.06 Hz
+Mode:          ⚡ NORMAL (Balanced)
+
+--------------------------------------------------------------------------------
+🌟 DAWN breathes naturally - values reflect real consciousness dynamics
+🔄 Ctrl+C or Ctrl+D to stop monitoring
+[2J[H
+🧠 DAWN CONSCIOUSNESS SYSTEM - LIVE MONITOR
+================================================================================
+🕐 05:03:08.584 | Uptime: 4.5s | Data: Live (0.828s)
+
+🧠 CONSCIOUSNESS METRICS
+----------------------------------------
+Consciousness: 0.597 [███████████░░░░░░░░░]
+Unity Score:   0.722 [██████████████░░░░░░]
+Awareness:     0.322 [██████░░░░░░░░░░░░░░]
+SCUP Value:    0.154 [███░░░░░░░░░░░░░░░░░] 🔴 UNSTABLE
+
+📊 SCUP COMPONENT ANALYSIS
+----------------------------------------
+Alignment:     0.722 [██████████████░░░░░░] 🟢 HIGH
+Entropy:       0.403 [████████░░░░░░░░░░░░] 🟡 MED
+Pressure:      0.262 [█████░░░░░░░░░░░░░░░] 🟢 LOW
+Drift:         0.072 [█░░░░░░░░░░░░░░░░░░░] 🟢 NORM
+SCUP Health:   0.695 [█████████████░░░░░░░] 🟡 GOOD
+
+🔬 TRACER ECOSYSTEM
+----------------------------------------
+Status:        ⚪ INITIALIZING
+
+💻 SYSTEM STATUS
+----------------------------------------
+Engine:        🟢 RUNNING
+Phase:         🔄 PROCESSING
+Modules:       📦 0
+Load:          26.2% [█████░░░░░░░░░░░░░░░]
+Heat:          12.6 [██░░░░░░░░░░░░░░░░░░]
+
+⏱️  ADAPTIVE TIMING (DAWN Controls Her Breathing)
+--------------------------------------------------
+Tick Count:    #7,444
+Cycle Time:    0.957s
+Phase Time:    ⚪ Calculating...
+Frequency:     1.04 Hz
+Mode:          ⚡ NORMAL (Balanced)
+
+📈 RECENT TRENDS (Last 5 ticks)
+------------------------------
+Avg Consciousness: 0.550
+Avg Unity:         0.693
+Avg Cycle Time:    0.921s
+
+--------------------------------------------------------------------------------
+🌟 DAWN breathes naturally - values reflect real consciousness dynamics
+🔄 Ctrl+C or Ctrl+D to stop monitoring
+[2J[H
+🧠 DAWN CONSCIOUSNESS SYSTEM - LIVE MONITOR
+================================================================================
+🕐 05:03:09.585 | Uptime: 5.5s | Data: Live (0.872s)
+
+🧠 CONSCIOUSNESS METRICS
+----------------------------------------
+Consciousness: 0.626 [████████████░░░░░░░░]
+Unity Score:   0.726 [██████████████░░░░░░]
+Awareness:     0.364 [███████░░░░░░░░░░░░░]
+SCUP Value:    0.170 [███░░░░░░░░░░░░░░░░░] 🔴 UNSTABLE
+
+📊 SCUP COMPONENT ANALYSIS
+----------------------------------------
+Alignment:     0.726 [██████████████░░░░░░] 🟢 HIGH
+Entropy:       0.374 [███████░░░░░░░░░░░░░] 🟢 LOW
+Pressure:      0.232 [████░░░░░░░░░░░░░░░░] 🟢 LOW
+Drift:         0.077 [█░░░░░░░░░░░░░░░░░░░] 🟢 NORM
+SCUP Health:   0.723 [██████████████░░░░░░] 🟡 GOOD
+
+🔬 TRACER ECOSYSTEM
+----------------------------------------
+Status:        ⚪ INITIALIZING
+
+💻 SYSTEM STATUS
+----------------------------------------
+Engine:        🟢 RUNNING
+Phase:         🔄 INTEGRATION
+Modules:       📦 0
+Load:          23.2% [████░░░░░░░░░░░░░░░░]
+Heat:          10.3 [██░░░░░░░░░░░░░░░░░░]
+
+⏱️  ADAPTIVE TIMING (DAWN Controls Her Breathing)
+--------------------------------------------------
+Tick Count:    #7,445
+Cycle Time:    0.967s
+Phase Time:    ⚪ Calculating...
+Frequency:     1.03 Hz
+Mode:          ⚡ NORMAL (Balanced)
+
+📈 RECENT TRENDS (Last 5 ticks)
+------------------------------
+Avg Consciousness: 0.573
+Avg Unity:         0.707
+Avg Cycle Time:    0.938s
+
+--------------------------------------------------------------------------------
+🌟 DAWN breathes naturally - values reflect real consciousness dynamics
+🔄 Ctrl+C or Ctrl+D to stop monitoring
+[2J[H
+🧠 DAWN CONSCIOUSNESS SYSTEM - LIVE MONITOR
+================================================================================
+🕐 05:03:10.586 | Uptime: 6.5s | Data: Live (0.906s)
+
+🧠 CONSCIOUSNESS METRICS
+----------------------------------------
+Consciousness: 0.657 [█████████████░░░░░░░]
+Unity Score:   0.725 [██████████████░░░░░░]
+Awareness:     0.416 [████████░░░░░░░░░░░░]
+SCUP Value:    0.183 [███░░░░░░░░░░░░░░░░░] 🔴 UNSTABLE
+
+📊 SCUP COMPONENT ANALYSIS
+----------------------------------------
+Alignment:     0.725 [██████████████░░░░░░] 🟢 HIGH
+Entropy:       0.343 [██████░░░░░░░░░░░░░░] 🟢 LOW
+Pressure:      0.198 [███░░░░░░░░░░░░░░░░░] 🟢 LOW
+Drift:         0.082 [█░░░░░░░░░░░░░░░░░░░] 🟢 NORM
+SCUP Health:   0.751 [███████████████░░░░░] 🟡 GOOD
+
+🔬 TRACER ECOSYSTEM
+----------------------------------------
+Status:        ⚪ INITIALIZING
+
+💻 SYSTEM STATUS
+----------------------------------------
