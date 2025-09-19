@@ -13,6 +13,16 @@ class ConsciousnessState:
     
     # Advanced consciousness metrics
     coherence: float = 0.0
+    integration_quality: float = 0.0
+    stability_coherence: float = 0.0
+    visual_coherence: float = 0.0
+    artistic_coherence: float = 0.0
+    meta_cognitive_activity: float = 0.0
+    cycle_count: int = 0
+    growth_rate: float = 0.0
+    seed: int = 0
+    session_id: str = ""
+    demo_name: str = ""
     sync_status: str = "initializing"  # "initializing"|"syncing"|"synchronized"|"fragmented"
     
     # SCUP (System Consciousness Unity Protocol) metrics
@@ -38,6 +48,15 @@ def set_state(**kw):
     for k,v in kw.items(): setattr(STATE, k, v)
     STATE.peak_unity = max(STATE.peak_unity, STATE.unity)
     STATE.level = label_for(STATE.unity, STATE.awareness)
+    # Calculate integration_quality as combination of unity and awareness
+    STATE.integration_quality = (STATE.unity + STATE.awareness) / 2.0
+    # Calculate stability_coherence based on coherence and integration
+    STATE.stability_coherence = (STATE.coherence + STATE.integration_quality) / 2.0
+    # Calculate visual and artistic coherence based on integration quality
+    STATE.visual_coherence = STATE.integration_quality * 0.9  # Slightly lower than integration
+    STATE.artistic_coherence = STATE.integration_quality * 0.8  # Even lower for artistic expression
+    STATE.meta_cognitive_activity = STATE.awareness * 0.95  # Based on awareness level
+    STATE.growth_rate = (STATE.unity + STATE.awareness) * 0.1  # Growth potential based on consciousness
     STATE.updated_at = time()
 
 def get_state(): return STATE

@@ -76,6 +76,23 @@ class CrowTracer(BaseTracer):
             self.anomalies_detected += len(reports)
             self.last_significant_find = current_tick
             
+            # Log significant findings to telemetry
+            self.log_to_telemetry('crow_anomalies_detected', {
+                'anomaly_count': len(reports),
+                'total_anomalies': self.anomalies_detected,
+                'tick_id': current_tick,
+                'report_types': [r.report_type for r in reports]
+            })
+            
+            # Broadcast critical findings to consciousness
+            critical_reports = [r for r in reports if r.severity == AlertSeverity.CRITICAL]
+            if critical_reports:
+                self.broadcast_to_consciousness('critical_anomalies_detected', {
+                    'critical_count': len(critical_reports),
+                    'anomaly_types': [r.report_type for r in critical_reports],
+                    'immediate_attention_required': True
+                })
+            
         return reports
     
     def _check_bloom_anomalies(self, context: Dict[str, Any], reports: List[TracerReport]) -> None:

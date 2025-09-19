@@ -96,12 +96,32 @@ class TickOrchestrator:
     execution phases, barrier synchronization, and performance monitoring.
     """
     
-    def __init__(self, consciousness_bus, consensus_engine, 
+    def __init__(self, consciousness_bus=None, consensus_engine=None, 
                  default_timeout: float = 2.0, max_parallel_modules: int = 8):
         """Initialize the tick orchestrator."""
         self.orchestrator_id = str(uuid.uuid4())
-        self.consciousness_bus = consciousness_bus
-        self.consensus_engine = consensus_engine
+        
+        # Use DAWN singleton if components not provided
+        if consciousness_bus is None or consensus_engine is None:
+            try:
+                from dawn.core.singleton import get_dawn
+                dawn_system = get_dawn()
+                
+                self.consciousness_bus = consciousness_bus or dawn_system.consciousness_bus
+                # Consensus engine might not be available yet, that's ok
+                self.consensus_engine = consensus_engine
+                self.telemetry_system = dawn_system.telemetry_system
+                logger.info("🌅 Tick orchestrator using DAWN singleton")
+            except ImportError:
+                logger.warning("DAWN singleton not available")
+                self.consciousness_bus = consciousness_bus
+                self.consensus_engine = consensus_engine
+                self.telemetry_system = None
+        else:
+            self.consciousness_bus = consciousness_bus
+            self.consensus_engine = consensus_engine
+            self.telemetry_system = None
+            
         self.creation_time = datetime.now()
         
         # Lifecycle control

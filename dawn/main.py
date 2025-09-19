@@ -26,6 +26,7 @@ import signal
 import time
 from typing import Dict, List, Optional, Any
 from pathlib import Path
+from collections import deque
 
 # Add the DAWN package to the Python path
 dawn_root = Path(__file__).parent.parent
@@ -44,11 +45,46 @@ try:
         log_event, log_performance, log_error, create_performance_context
     )
     from dawn.core.telemetry.logger import TelemetryLevel
+    from dawn.core.telemetry.enhanced_module_logger import (
+        get_enhanced_logger, log_module_tick, export_all_module_states,
+        EnhancedModuleLogger, StateChangeType
+    )
     TELEMETRY_AVAILABLE = True
+    ENHANCED_LOGGING_AVAILABLE = True
 except ImportError as e:
     # Logger not yet defined, use print for this early warning
     print(f"Warning: Telemetry system not available: {e}")
     TELEMETRY_AVAILABLE = False
+    ENHANCED_LOGGING_AVAILABLE = False
+    
+    # Mock enhanced logging functions
+    def get_enhanced_logger(*args, **kwargs): 
+        class MockLogger:
+            def log_tick_update(self, *args, **kwargs): return {}
+            def log_movement(self, *args, **kwargs): pass
+            def get_current_json(self): return {}
+        return MockLogger()
+    
+    def log_module_tick(*args, **kwargs): return {}
+    def export_all_module_states(*args, **kwargs): return []
+
+# Universal JSON logging system imports
+try:
+    from dawn.core.logging import (
+        start_complete_dawn_logging, get_dawn_integration_stats,
+        log_all_dawn_system_states, get_universal_logger,
+        LoggingConfig, LogFormat, StateScope
+    )
+    UNIVERSAL_LOGGING_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Universal JSON logging system not available: {e}")
+    UNIVERSAL_LOGGING_AVAILABLE = False
+    
+    # Mock functions
+    def start_complete_dawn_logging(): return {}
+    def get_dawn_integration_stats(): return {}
+    def log_all_dawn_system_states(*args): return 0
+    def get_universal_logger(): return None
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -82,6 +118,16 @@ class DAWNRunner:
         self.telemetry_enabled = self.config.get('telemetry_enabled', TELEMETRY_AVAILABLE)
         self.telemetry_profile = self.config.get('telemetry_profile', 'production' if self.mode == 'daemon' else 'development')
         
+        # Enhanced module logging
+        self.enhanced_logger = None
+        self.module_loggers: Dict[str, EnhancedModuleLogger] = {}
+        self.tick_json_history: deque = deque(maxlen=1000)  # Store tick JSON history
+        
+        # Universal JSON logging
+        self.universal_logger = None
+        self.universal_logging_enabled = self.config.get('universal_logging_enabled', UNIVERSAL_LOGGING_AVAILABLE)
+        self.universal_logging_stats = {}
+        
         # System state
         self.running = False
         self.initialized = False
@@ -93,6 +139,14 @@ class DAWNRunner:
         # Initialize telemetry system
         if self.telemetry_enabled:
             self._initialize_telemetry()
+            
+        # Initialize enhanced module logging
+        if ENHANCED_LOGGING_AVAILABLE:
+            self._initialize_enhanced_logging()
+        
+        # Initialize universal JSON logging
+        if self.universal_logging_enabled:
+            self._initialize_universal_logging()
         
         # Signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -168,6 +222,91 @@ class DAWNRunner:
         # In interactive mode, also print to console
         if self.mode == 'interactive':
             print(f"\n🚨 TELEMETRY ALERT [{alert_type}]: {message}")
+    
+    def _initialize_universal_logging(self):
+        """Initialize universal JSON logging system"""
+        try:
+            logger.info("🔍 Initializing universal JSON logging system...")
+            
+            # Configure universal logging based on mode
+            if self.mode == 'daemon':
+                logging_config = {
+                    'format': 'jsonl',
+                    'scope': 'full',
+                    'flush_interval_seconds': 1.0,
+                    'enable_compression': True,
+                    'max_file_size_mb': 100
+                }
+            else:
+                logging_config = {
+                    'format': 'jsonl',
+                    'scope': 'changes_only',
+                    'flush_interval_seconds': 2.0,
+                    'enable_compression': False,
+                    'max_file_size_mb': 50
+                }
+            
+            # Start complete DAWN logging with all systems
+            integration_results = start_complete_dawn_logging()
+            
+            # Get universal logger instance
+            self.universal_logger = get_universal_logger()
+            
+            # Store integration results
+            self.universal_logging_stats = {
+                'integration_results': integration_results,
+                'initialized_at': time.time(),
+                'mode': self.mode
+            }
+            
+            # Report results
+            successful = sum(1 for success in integration_results.values() if success)
+            total = len(integration_results)
+            
+            logger.info(f"✅ Universal JSON logging initialized: {successful}/{total} systems integrated")
+            
+            # Log this initialization event
+            if self.telemetry_system:
+                self.telemetry_system.log_event(
+                    'dawn_runner', 'universal_logging', 'system_initialized',
+                    TelemetryLevel.INFO,
+                    {
+                        'systems_integrated': successful,
+                        'total_systems': total,
+                        'integration_results': integration_results,
+                        'logging_config': logging_config
+                    }
+                )
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize universal JSON logging: {e}")
+            self.universal_logging_enabled = False
+    
+    def _initialize_enhanced_logging(self):
+        """Initialize enhanced module logging system"""
+        try:
+            # Create main runner enhanced logger
+            self.enhanced_logger = get_enhanced_logger('dawn_runner', 'core')
+            
+            # Create loggers for major subsystems
+            subsystem_modules = [
+                ('consciousness_engine', 'consciousness'),
+                ('pulse_system', 'thermal'),
+                ('schema_system', 'schema'),
+                ('memory_system', 'memory'),
+                ('tick_orchestrator', 'processing'),
+                ('consensus_engine', 'communication')
+            ]
+            
+            for module_name, subsystem in subsystem_modules:
+                logger_key = f"{subsystem}.{module_name}"
+                self.module_loggers[logger_key] = get_enhanced_logger(module_name, subsystem)
+            
+            logger.info(f"🔍 Enhanced logging initialized for {len(self.module_loggers)} modules")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize enhanced logging: {e}")
+            self.enhanced_logger = None
     
     def _signal_handler(self, signum, frame):
         """Handle system signals for graceful shutdown."""
@@ -390,23 +529,73 @@ class DAWNRunner:
                 logger.error(f"Command error: {e}")
     
     async def _run_daemon(self):
-        """Run in daemon mode (background service)."""
-        logger.info("⚙️ Running in daemon mode...")
+        """Run in daemon mode (background service) with enhanced logging."""
+        logger.info("⚙️ Running in daemon mode with enhanced logging...")
+        
+        tick_counter = 0
         
         while self.running:
             try:
+                tick_counter += 1
+                
+                # Enhanced logging for daemon tick
+                if self.enhanced_logger:
+                    # Collect comprehensive system state
+                    system_state = await self._collect_system_state()
+                    
+                    # Log tick update with full state tracking
+                    tick_json = self.enhanced_logger.log_tick_update(
+                        system_state, 
+                        tick_number=tick_counter
+                    )
+                    
+                    # Store in history
+                    self.tick_json_history.append(tick_json)
+                    
+                    # Log to individual module loggers
+                    await self._log_subsystem_states(tick_counter)
+                
                 # In daemon mode, just keep the system running
                 # and let the tick orchestrator handle consciousness updates
                 await asyncio.sleep(1.0)
                 
-                # Periodic health check
+                # Periodic health check with enhanced logging
                 if self.consciousness_bus:
                     metrics = self.consciousness_bus.get_bus_metrics()
+                    
+                    # Log consciousness metrics
+                    if self.module_loggers.get('communication.consensus_engine'):
+                        self.module_loggers['communication.consensus_engine'].log_tick_update(
+                            {'bus_metrics': metrics}, tick_counter
+                        )
+                    
                     if metrics['consciousness_coherence'] < 0.5:
                         logger.warning(f"⚠️ Low consciousness coherence: {metrics['consciousness_coherence']:.3f}")
                         
+                        # Log coherence issue
+                        if ENHANCED_LOGGING_AVAILABLE:
+                            log_module_tick('coherence_monitor', 'core', {
+                                'coherence_level': metrics['consciousness_coherence'],
+                                'alert_triggered': True,
+                                'threshold': 0.5
+                            }, tick_counter)
+                
+                # Export states periodically
+                if tick_counter % 100 == 0:  # Every 100 ticks
+                    await self._periodic_state_export(tick_counter)
+                        
             except Exception as e:
                 logger.error(f"Daemon loop error: {e}")
+                
+                # Log error state
+                if self.enhanced_logger:
+                    self.enhanced_logger.log_tick_update({
+                        'error': str(e),
+                        'error_type': type(e).__name__,
+                        'tick': tick_counter,
+                        'daemon_status': 'error'
+                    }, tick_counter)
+                
                 await asyncio.sleep(5.0)  # Brief pause before retry
     
     async def _run_test(self):
@@ -672,6 +861,142 @@ class DAWNRunner:
                     'dawn_runner', 'lifecycle', e,
                     {'shutdown_duration': time.time() - shutdown_start}
                 )
+    
+    async def _collect_system_state(self) -> Dict[str, Any]:
+        """Collect comprehensive system state for enhanced logging"""
+        state = {
+            'timestamp': time.time(),
+            'running': self.running,
+            'initialized': self.initialized,
+            'mode': self.mode,
+            'modules_loaded': len(self.modules_loaded),
+            'telemetry_enabled': self.telemetry_enabled
+        }
+        
+        # Consciousness bus state
+        if self.consciousness_bus:
+            try:
+                bus_metrics = self.consciousness_bus.get_bus_metrics()
+                state['consciousness_bus'] = {
+                    'coherence': bus_metrics.get('consciousness_coherence', 0.0),
+                    'registered_modules': bus_metrics.get('registered_modules', 0),
+                    'active_subscriptions': bus_metrics.get('active_subscriptions', 0),
+                    'events_processed': bus_metrics.get('performance_metrics', {}).get('events_processed', 0)
+                }
+            except Exception as e:
+                state['consciousness_bus'] = {'error': str(e)}
+        
+        # DAWN engine state
+        if self.dawn_engine:
+            try:
+                engine_status = self.dawn_engine.get_engine_status()
+                state['dawn_engine'] = {
+                    'tick_count': engine_status.get('tick_count', 0),
+                    'unity_score': engine_status.get('consciousness_unity_score', 0.0),
+                    'registered_modules': engine_status.get('registered_modules', 0),
+                    'performance_metrics': engine_status.get('performance_metrics', {})
+                }
+            except Exception as e:
+                state['dawn_engine'] = {'error': str(e)}
+        
+        # Tick orchestrator state
+        if self.tick_orchestrator:
+            try:
+                orchestrator_status = self.tick_orchestrator.get_orchestrator_status()
+                state['tick_orchestrator'] = {
+                    'total_ticks': orchestrator_status.get('metrics', {}).get('total_ticks_executed', 0),
+                    'successful_ticks': orchestrator_status.get('metrics', {}).get('successful_ticks', 0),
+                    'registered_modules': orchestrator_status.get('registered_modules', 0)
+                }
+            except Exception as e:
+                state['tick_orchestrator'] = {'error': str(e)}
+        
+        # Telemetry system state
+        if self.telemetry_system:
+            try:
+                telemetry_metrics = self.telemetry_system.get_system_metrics()
+                state['telemetry_system'] = {
+                    'running': telemetry_metrics.get('running', False),
+                    'events_logged': telemetry_metrics.get('logger_events_logged', 0),
+                    'buffer_size': telemetry_metrics.get('logger_buffer_stats', {}).get('current_size', 0),
+                    'exporters': telemetry_metrics.get('exporters', [])
+                }
+            except Exception as e:
+                state['telemetry_system'] = {'error': str(e)}
+        
+        return state
+    
+    async def _log_subsystem_states(self, tick_number: int):
+        """Log states for all subsystems with enhanced tracking"""
+        try:
+            # Universal JSON logging - log ALL system states
+            if self.universal_logging_enabled and self.universal_logger:
+                logged_count = log_all_dawn_system_states(tick_number)
+                if logged_count > 0:
+                    logger.debug(f"🔍 Universal logging: logged {logged_count} system states for tick {tick_number}")
+            
+            # Log consciousness engine state if available
+            if self.dawn_engine and 'consciousness.consciousness_engine' in self.module_loggers:
+                engine_logger = self.module_loggers['consciousness.consciousness_engine']
+                engine_status = self.dawn_engine.get_engine_status()
+                
+                engine_logger.log_tick_update({
+                    'engine_id': engine_status.get('engine_id'),
+                    'status': engine_status.get('status'),
+                    'tick_count': engine_status.get('tick_count', 0),
+                    'unity_score': engine_status.get('consciousness_unity_score', 0.0),
+                    'performance_metrics': engine_status.get('performance_metrics', {}),
+                    'self_modification_metrics': engine_status.get('self_modification_metrics', {})
+                }, tick_number)
+            
+            # Log processing engine state
+            if self.tick_orchestrator and 'processing.tick_orchestrator' in self.module_loggers:
+                orchestrator_logger = self.module_loggers['processing.tick_orchestrator']
+                orchestrator_status = self.tick_orchestrator.get_orchestrator_status()
+                
+                orchestrator_logger.log_tick_update({
+                    'total_ticks': orchestrator_status.get('metrics', {}).get('total_ticks_executed', 0),
+                    'successful_ticks': orchestrator_status.get('metrics', {}).get('successful_ticks', 0),
+                    'registered_modules': orchestrator_status.get('registered_modules', 0),
+                    'active_modules': orchestrator_status.get('active_modules', []),
+                    'performance_summary': orchestrator_status.get('performance_summary', {})
+                }, tick_number)
+            
+            # Log telemetry system state
+            if self.telemetry_system and 'core.telemetry_system' in self.module_loggers:
+                telemetry_logger = self.module_loggers.get('core.telemetry_system')
+                if telemetry_logger:
+                    telemetry_metrics = self.telemetry_system.get_system_metrics()
+                    
+                    telemetry_logger.log_tick_update({
+                        'running': telemetry_metrics.get('running', False),
+                        'events_logged': telemetry_metrics.get('logger_events_logged', 0),
+                        'buffer_stats': telemetry_metrics.get('logger_buffer_stats', {}),
+                        'collector_metrics': telemetry_metrics.get('collector_aggregations_performed', 0),
+                        'exporters_active': len(telemetry_metrics.get('exporters', []))
+                    }, tick_number)
+            
+        except Exception as e:
+            logger.error(f"Error logging subsystem states: {e}")
+    
+    async def _periodic_state_export(self, tick_number: int):
+        """Periodically export all module states"""
+        try:
+            if ENHANCED_LOGGING_AVAILABLE:
+                exported_files = export_all_module_states(f"logs/exports/tick_{tick_number}")
+                logger.info(f"🔍 Exported {len(exported_files)} module states at tick {tick_number}")
+                
+                # Log the export event
+                if self.enhanced_logger:
+                    self.enhanced_logger.log_tick_update({
+                        'export_event': True,
+                        'exported_files': len(exported_files),
+                        'export_tick': tick_number,
+                        'export_timestamp': time.time()
+                    }, tick_number)
+            
+        except Exception as e:
+            logger.error(f"Error during periodic state export: {e}")
 
 
 def parse_arguments():

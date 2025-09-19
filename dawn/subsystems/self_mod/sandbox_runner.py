@@ -24,7 +24,15 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from dawn_core.self_mod.patch_builder import PatchResult
+# Add DAWN root to Python path when running as script
+if __name__ == "__main__":
+    # Get the DAWN root directory (3 levels up from this file)
+    current_dir = pathlib.Path(__file__).resolve()
+    dawn_root = current_dir.parent.parent.parent.parent
+    if str(dawn_root) not in sys.path:
+        sys.path.insert(0, str(dawn_root))
+
+from dawn.subsystems.self_mod.patch_builder import PatchResult
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +141,7 @@ class SandboxRunner:
         self.creation_time = datetime.now()
         
         # Configuration
-        self.default_timeout = 30.0  # seconds
+        self.default_timeout = 90.0  # seconds (increased for 30s warm-up period)
         self.health_check_interval = 0.1  # seconds
         self.max_retries = 3
         
@@ -259,11 +267,17 @@ import json
 import time
 import sys
 import traceback
+import asyncio
 
 def sandbox_execution():
     try:
         # Import DAWN components
-        from dawn_core.state import set_state, get_state, label_for
+        from dawn.core.foundation.state import set_state, get_state, label_for, is_meta_aware, is_transcendent
+        from dawn.core.singleton import get_dawn
+        
+        # Initialize DAWN singleton
+        # Note: Status messages suppressed to avoid JSON parsing issues
+        dawn = get_dawn()
         
         # Initialize state
         set_state(
@@ -274,7 +288,45 @@ def sandbox_execution():
             ticks={initial_state['ticks']}
         )
         
-        # Record initial state
+        # Warm-up period - let DAWN process idle for 30 seconds
+        # Status messages suppressed to avoid JSON parsing issues
+        warmup_start = time.time()
+        warmup_duration = 30.0  # 30 seconds
+        
+        while time.time() - warmup_start < warmup_duration:
+            current_state = get_state()
+            # Light processing during warm-up
+            new_unity = min(1.0, current_state.unity + 0.001)  # Very small increments
+            new_awareness = min(1.0, current_state.awareness + 0.001)
+            
+            set_state(
+                unity=new_unity,
+                awareness=new_awareness,
+                momentum=current_state.momentum,
+                level=label_for(new_unity, new_awareness),
+                ticks=current_state.ticks + 1
+            )
+            
+            time.sleep(0.1)  # 100ms between updates
+        
+        # Check coherence after warm-up
+        final_warmup_state = get_state()
+        
+        # Stop if coherence isn't met (require meta_aware or transcendent)
+        if not (is_meta_aware() or is_transcendent()):
+            return {{
+                "ok": False,
+                "error": "Insufficient coherence after warm-up period",
+                "warmup_completed": True,
+                "final_level": final_warmup_state.level,
+                "final_unity": final_warmup_state.unity,
+                "final_awareness": final_warmup_state.awareness,
+                "coherence_met": False
+            }}
+        
+        # Coherence achieved - proceed with main execution
+        
+        # Record initial state (post-warmup)
         initial_state = get_state()
         history = []
         
@@ -285,7 +337,9 @@ def sandbox_execution():
         
         # Try to import patched demo_step if available
         try:
-            from dawn_core.tick_orchestrator import demo_step
+            # Note: demo_step not available in current architecture
+            # This is a placeholder for future patched demo_step imports
+            pass
         except ImportError:
             # Use local demo_step if import fails
             pass
@@ -336,7 +390,10 @@ def sandbox_execution():
             "start_level": initial_state.level,
             "end_level": final_state.level,
             "history": history,
-            "step_size_used": demo_step()
+            "step_size_used": demo_step(),
+            "warmup_completed": True,
+            "coherence_met": True,
+            "dawn_singleton_initialized": True
         }}
         
         return result
@@ -355,49 +412,243 @@ print(json.dumps(result, indent=2))
         return code
     
     def _execute_subprocess(self, code: str, env: Dict[str, str], timeout: float) -> Dict[str, Any]:
-        """Execute code in subprocess with timeout."""
+        """Execute code in subprocess with timeout and enhanced error handling."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         try:
+            # Log subprocess execution details for debugging
+            logger.debug(f"🏃 Executing subprocess with timeout {timeout}s")
+            logger.debug(f"🏃 Python executable: {sys.executable}")
+            logger.debug(f"🏃 Environment variables: {len(env)} vars")
+            
+            # Check if code looks valid
+            if not code or not code.strip():
+                return {
+                    "ok": False,
+                    "error": "Empty or invalid code provided to subprocess",
+                    "stderr": "",
+                    "stdout": "",
+                    "debug_info": {"code_length": len(code), "code_preview": code[:100] if code else "None"}
+                }
+            
+            # Log the exact command being executed
+            command_args = [sys.executable, "-c", code]
+            logger.info(f"🏃 EXECUTING SUBPROCESS COMMAND:")
+            logger.info(f"🏃   Executable: {sys.executable}")
+            logger.info(f"🏃   Arguments: {command_args[:2]}  # [python, '-c']")
+            logger.info(f"🏃   Working Directory: {os.getcwd()}")
+            logger.info(f"🏃   Timeout: {timeout}s")
+            logger.info(f"🏃   Environment Variables: {len(env)} vars")
+            logger.info(f"🏃   Code Length: {len(code)} characters")
+            logger.info(f"🏃   Code Preview (first 200 chars):")
+            logger.info(f"🏃   {repr(code[:200])}{'...' if len(code) > 200 else ''}")
+            
+            # Log critical environment variables
+            critical_env_vars = ['PYTHONPATH', 'PATH', 'DAWN_BASELINE_MODE', 'PWD']
+            for var in critical_env_vars:
+                if var in env:
+                    logger.info(f"🏃   ENV[{var}]: {env[var]}")
+            
             process = subprocess.run(
-                [sys.executable, "-c", code],
+                command_args,
                 env=env,
                 capture_output=True,
                 text=True,
-                timeout=timeout
+                timeout=timeout,
+                cwd=os.getcwd()
             )
             
+            # Enhanced error reporting for non-zero exit codes
             if process.returncode != 0:
+                logger.error(f"🏃 ❌ SUBPROCESS COMMAND FAILED ❌")
+                logger.error(f"🏃 Exit Code: {process.returncode}")
+                logger.error(f"🏃 Failed Command: {command_args[0]} {command_args[1]} <code>")
+                logger.error(f"🏃 Working Directory: {os.getcwd()}")
+                logger.error(f"🏃 Python Executable: {sys.executable}")
+                logger.error(f"🏃 Code that failed:")
+                logger.error(f"🏃 {'-' * 60}")
+                code_lines = code.split('\n')
+                for i, line in enumerate(code_lines[:20], 1):  # Show first 20 lines
+                    logger.error(f"🏃 {i:3d}: {line}")
+                if len(code_lines) > 20:
+                    logger.error(f"🏃 ... ({len(code_lines) - 20} more lines)")
+                logger.error(f"🏃 {'-' * 60}")
+                logger.error(f"🏃 STDERR Output:")
+                for line in process.stderr.split('\n') if process.stderr else []:
+                    if line.strip():
+                        logger.error(f"🏃 STDERR: {line}")
+                logger.error(f"🏃 STDOUT Output:")
+                for line in process.stdout.split('\n') if process.stdout else []:
+                    if line.strip():
+                        logger.error(f"🏃 STDOUT: {line}")
+                
+                # Try to identify common error patterns
+                error_analysis = self._analyze_subprocess_error(process.stderr, process.stdout)
+                
                 return {
                     "ok": False,
                     "error": f"Process exited with code {process.returncode}",
                     "stderr": process.stderr,
-                    "stdout": process.stdout
+                    "stdout": process.stdout,
+                    "debug_info": {
+                        "exit_code": process.returncode,
+                        "error_analysis": error_analysis,
+                        "python_executable": sys.executable,
+                        "working_directory": os.getcwd(),
+                        "environment_vars": list(env.keys()),
+                        "code_preview": code[:200] + "..." if len(code) > 200 else code
+                    }
                 }
             
-            # Parse JSON output
+            # Parse JSON output with better error handling
             try:
+                if not process.stdout.strip():
+                    logger.warning("🏃 Subprocess produced no output")
+                    return {
+                        "ok": False,
+                        "error": "Subprocess completed successfully but produced no output",
+                        "stderr": process.stderr,
+                        "stdout": process.stdout,
+                        "debug_info": {"exit_code": process.returncode}
+                    }
+                
                 result = json.loads(process.stdout)
                 result["stderr"] = process.stderr
                 result["stdout"] = process.stdout
+                result["debug_info"] = {"exit_code": process.returncode, "parsing": "success"}
+                
+                logger.info(f"🏃 ✅ SUBPROCESS COMMAND SUCCEEDED ✅")
+                logger.info(f"🏃 Exit Code: {process.returncode}")
+                logger.info(f"🏃 Command: {command_args[0]} {command_args[1]} <code>")
+                logger.info(f"🏃 Output Length: {len(process.stdout)} chars")
+                logger.debug(f"🏃 JSON Output Preview: {process.stdout[:200]}{'...' if len(process.stdout) > 200 else ''}")
                 return result
+                
             except json.JSONDecodeError as e:
+                logger.error(f"🏃 Failed to parse JSON output: {e}")
+                logger.error(f"🏃 Raw stdout: {repr(process.stdout)}")
+                
                 return {
                     "ok": False,
                     "error": f"Failed to parse JSON output: {e}",
                     "stderr": process.stderr,
-                    "stdout": process.stdout
+                    "stdout": process.stdout,
+                    "debug_info": {
+                        "json_error": str(e),
+                        "stdout_length": len(process.stdout),
+                        "stdout_preview": process.stdout[:200] if process.stdout else "Empty"
+                    }
                 }
                 
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"🏃 Subprocess timed out after {timeout} seconds")
             return {
                 "ok": False,
                 "error": f"Execution timed out after {timeout} seconds",
-                "timeout": True
+                "stderr": getattr(e, 'stderr', '') or '',
+                "stdout": getattr(e, 'stdout', '') or '',
+                "debug_info": {
+                    "timeout": timeout,
+                    "error_type": "TimeoutExpired"
+                }
             }
         except Exception as e:
+            logger.error(f"🏃 Unexpected error during subprocess execution: {e}")
             return {
                 "ok": False,
-                "error": f"Subprocess execution failed: {e}"
+                "error": f"Unexpected subprocess error: {e}",
+                "stderr": "",
+                "stdout": "",
+                "debug_info": {
+                    "exception_type": type(e).__name__,
+                    "exception_message": str(e)
+                }
             }
+    
+    def _analyze_subprocess_error(self, stderr: str, stdout: str) -> Dict[str, Any]:
+        """Analyze subprocess error output to identify common issues."""
+        analysis = {
+            "error_type": "unknown",
+            "likely_cause": "unknown",
+            "suggestions": []
+        }
+        
+        if not stderr and not stdout:
+            analysis.update({
+                "error_type": "no_output",
+                "likely_cause": "Process exited without producing any output",
+                "suggestions": ["Check if the code is valid Python", "Verify all imports are available"]
+            })
+            return analysis
+        
+        error_text = (stderr + stdout).lower()
+        
+        # Import errors
+        if "importerror" in error_text or "modulenotfounderror" in error_text:
+            analysis.update({
+                "error_type": "import_error",
+                "likely_cause": "Missing module or incorrect import path",
+                "suggestions": [
+                    "Check if all required modules are installed",
+                    "Verify import paths are correct",
+                    "Check PYTHONPATH environment variable"
+                ]
+            })
+            
+            # Specific dawn_core import issues
+            if "dawn_core" in error_text:
+                analysis["suggestions"].extend([
+                    "Ensure dawn_core module exists and is accessible",
+                    "Check if dawn_core/__init__.py is present"
+                ])
+        
+        # Syntax errors
+        elif "syntaxerror" in error_text:
+            analysis.update({
+                "error_type": "syntax_error",
+                "likely_cause": "Invalid Python syntax in generated code",
+                "suggestions": [
+                    "Review generated code for syntax issues",
+                    "Check for proper indentation and brackets"
+                ]
+            })
+        
+        # JSON errors
+        elif "json" in error_text and ("decode" in error_text or "parse" in error_text):
+            analysis.update({
+                "error_type": "json_error",
+                "likely_cause": "Invalid JSON output from subprocess",
+                "suggestions": [
+                    "Check if subprocess is printing valid JSON",
+                    "Ensure no extra print statements interfere with JSON output"
+                ]
+            })
+        
+        # Permission errors
+        elif "permission" in error_text or "access" in error_text:
+            analysis.update({
+                "error_type": "permission_error",
+                "likely_cause": "Insufficient permissions to access files or directories",
+                "suggestions": [
+                    "Check file and directory permissions",
+                    "Ensure subprocess has access to required resources"
+                ]
+            })
+        
+        # Memory or resource errors
+        elif "memory" in error_text or "resource" in error_text:
+            analysis.update({
+                "error_type": "resource_error",
+                "likely_cause": "Insufficient system resources",
+                "suggestions": [
+                    "Check available memory",
+                    "Reduce subprocess resource usage",
+                    "Consider increasing timeout"
+                ]
+            })
+        
+        return analysis
     
     def _process_execution_result(self, run_id: str, execution_id: str, 
                                 result: Dict[str, Any], execution_time: float,
@@ -585,6 +836,12 @@ def run_sandbox(run_id: str, sandbox_dir: str, ticks: int = 30) -> Dict[str, Any
                 "start_unity": result.start_unity,
                 "end_unity": result.end_unity,
                 "delta_unity": result.delta_unity,
+                "start_awareness": result.start_awareness,
+                "end_awareness": result.end_awareness,
+                "delta_awareness": result.delta_awareness,
+                "start_momentum": result.start_momentum,
+                "end_momentum": result.end_momentum,
+                "start_level": result.start_level,
                 "end_level": result.end_level,
                 "health_status": result.health_status.value,
                 "stability_score": result.stability_score,
@@ -611,8 +868,8 @@ def demo_sandbox_runner():
     print(f"📁 Results Directory: {runner.results_dir}")
     
     # Create a test sandbox to run
-    from dawn_core.self_mod.patch_builder import CodePatchBuilder
-    from dawn_core.self_mod.advisor import ModProposal, PatchType, ModificationPriority
+    from dawn.subsystems.self_mod.patch_builder import CodePatchBuilder
+    from dawn.subsystems.self_mod.advisor import ModProposal, PatchType, ModificationPriority
     
     print(f"\n🔧 Creating test sandbox for execution...")
     

@@ -115,6 +115,13 @@ discover_capabilities = _discovery.discover_capabilities
 load_module = _discovery.load_module
 register_plugin = _discovery.register_plugin
 
+# DAWN Global Singleton
+from dawn.core.singleton import (
+    get_dawn, reset_dawn_singleton, 
+    get_consciousness_state, get_system_status,
+    is_dawn_running, is_dawn_initialized
+)
+
 # Auto-discovery on import
 try:
     logger.info("DAWN: Initializing modular consciousness architecture...")
@@ -139,6 +146,9 @@ def __getattr__(name: str):
 __all__ = [
     # Core functions
     'discover_capabilities', 'load_module', 'register_plugin',
+    # DAWN Global Singleton
+    'get_dawn', 'reset_dawn_singleton', 'get_consciousness_state', 
+    'get_system_status', 'is_dawn_running', 'is_dawn_initialized',
     # Namespaces (lazy loaded)
     'core', 'consciousness', 'processing', 'memory', 'subsystems',
     'interfaces', 'capabilities', 'extensions', 'tools', 'research',

@@ -100,10 +100,25 @@ class ConsensusEngine:
     consensus building, and emergency override mechanisms.
     """
     
-    def __init__(self, consciousness_bus, decision_timeout: float = 5.0):
+    def __init__(self, consciousness_bus=None, decision_timeout: float = 5.0):
         """Initialize the consensus engine."""
         self.engine_id = str(uuid.uuid4())
-        self.consciousness_bus = consciousness_bus
+        
+        # Use DAWN singleton if consciousness_bus not provided
+        if consciousness_bus is None:
+            try:
+                from dawn.core.singleton import get_dawn
+                dawn_system = get_dawn()
+                self.consciousness_bus = dawn_system.consciousness_bus
+                self.telemetry_system = dawn_system.telemetry_system
+                logger.info("🌅 Consensus engine using DAWN singleton")
+            except ImportError:
+                logger.warning("DAWN singleton not available, consciousness_bus required")
+                raise ValueError("consciousness_bus required when DAWN singleton not available")
+        else:
+            self.consciousness_bus = consciousness_bus
+            self.telemetry_system = None
+            
         self.creation_time = datetime.now()
         
         # Decision coordination

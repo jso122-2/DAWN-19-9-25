@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from dawn_core.state import get_state, is_meta_aware, is_transcendent
+from dawn.core.foundation.state import get_state, is_meta_aware, is_transcendent
 
 logger = logging.getLogger(__name__)
 
@@ -334,7 +334,7 @@ class ConsciousnessAdvisor:
         
         return ModProposal(
             name="growth_acceleration",
-            target="dawn_core/state.py",
+            target="dawn/core/foundation/state.py",
             patch_type=PatchType.THRESHOLD,
             current_value=current_threshold,
             proposed_value=proposed_threshold,
@@ -500,7 +500,7 @@ def demo_consciousness_advisor():
         print(f"📋 Description: {scenario['description']}")
         
         # Set the test state
-        from dawn_core.state import set_state
+        from dawn.core.foundation.state import set_state
         set_state(**scenario['state'])
         
         # Show current state

@@ -22,10 +22,37 @@ from collections import deque, defaultdict
 import numpy as np
 import threading
 
-from core.schema_anomaly_logger import log_anomaly, AnomalySeverity
-from schema.registry import registry
-from rhizome.propagation import emit_signal, SignalType
-from utils.metrics_collector import metrics
+from dawn.subsystems.schema.schema_anomaly_logger import log_anomaly, AnomalySeverity
+from dawn.subsystems.schema.registry import ComponentType
+# Placeholder imports for missing modules
+try:
+    from schema.registry import registry
+except ImportError:
+    try:
+        from dawn.subsystems.schema.registry import registry
+    except ImportError:
+        # Create placeholder registry
+        class Registry:
+            def get(self, name, default=None): return default
+            def register(self, **kwargs): pass
+        registry = Registry()
+    
+try:
+    from dawn.subsystems.rhizome.propagation import emit_signal, SignalType
+except ImportError:
+    # Create placeholder functions
+    def emit_signal(signal_type, data=None): pass
+    class SignalType:
+        RECURSIVE_PATTERN = "recursive_pattern"
+        
+try:
+    from utils.metrics_collector import metrics
+except ImportError:
+    # Create placeholder metrics
+    class Metrics:
+        def increment(self, name): pass
+        def record(self, name, value): pass
+    metrics = Metrics()
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +169,7 @@ class RecursiveCodex:
         registry.register(
             component_id="schema.recursive_codex",
             name="Recursive Codex",
-            component_type="CORE_MODULE",
+            component_type=ComponentType.MODULE,
             instance=self,
             capabilities=[
                 "recursive_processing", 

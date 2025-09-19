@@ -71,7 +71,35 @@ class LogicalReasoning:
         self.confidence_threshold: float = 0.5
         self.max_reasoning_steps: int = 100
         
+        # DAWN singleton integration
+        self.dawn_system = None
+        self.consciousness_bus = None
+        self.telemetry_system = None
+        self._initialize_dawn_integration()
+        
         logger.info("🧠 Logical Reasoning module initialized")
+    
+    def _initialize_dawn_integration(self) -> None:
+        """Initialize integration with DAWN singleton"""
+        try:
+            from dawn.core.singleton import get_dawn
+            self.dawn_system = get_dawn()
+            
+            if self.dawn_system.is_initialized():
+                self.consciousness_bus = self.dawn_system.consciousness_bus
+                self.telemetry_system = self.dawn_system.telemetry_system
+                
+                # Register with consciousness bus
+                if self.consciousness_bus:
+                    self.consciousness_bus.register_module(
+                        "logical_reasoning",
+                        capabilities=["deductive_reasoning", "inductive_reasoning", "active_inference"],
+                        state_schema={"reasoning_confidence": "float", "conclusions_count": "int"}
+                    )
+                    logger.info("🌅 Logical reasoning registered with DAWN singleton")
+                    
+        except ImportError:
+            logger.info("🧠 DAWN singleton not available, logical reasoning running standalone")
     
     def deductive_reasoning(
         self, 

@@ -206,10 +206,13 @@ class DAWNEngine:
         # Configuration
         self.config = config or DAWNEngineConfig()
         
-        # Core consciousness unification systems
+        # Core consciousness unification systems - use singleton if available
         self.consciousness_bus = None
         self.consensus_engine = None
         self.tick_orchestrator = None
+        
+        # DAWN singleton integration
+        self._initialize_singleton_integration()
         
         # Module registry
         self.registered_modules = {}  # Dict[str, Any]
@@ -258,6 +261,29 @@ class DAWNEngine:
                      })
         
         logger.info(f"🌅 DAWN Engine initialized: {self.engine_id}")
+    
+    def _initialize_singleton_integration(self) -> None:
+        """Initialize integration with DAWN singleton if available"""
+        try:
+            from dawn.core.singleton import get_dawn
+            dawn_system = get_dawn()
+            
+            # This engine might BE the singleton's engine, so be careful
+            # Only use singleton components if they're different instances
+            if hasattr(dawn_system, '_dawn_engine') and dawn_system._dawn_engine is not self:
+                if dawn_system.consciousness_bus and not self.consciousness_bus:
+                    self.consciousness_bus = dawn_system.consciousness_bus
+                    logger.info("🌅 DAWN Engine using singleton consciousness bus")
+                    
+                if dawn_system.telemetry_system:
+                    # Log engine initialization to telemetry
+                    dawn_system.telemetry_system.log_event(
+                        'dawn_engine', 'initialization', 'engine_created',
+                        data={'engine_id': self.engine_id, 'config': str(self.config)}
+                    )
+                    
+        except ImportError:
+            logger.debug("DAWN singleton not available during engine initialization")
     
     def _initialize_consciousness_unification(self) -> None:
         """Initialize consciousness unification systems."""

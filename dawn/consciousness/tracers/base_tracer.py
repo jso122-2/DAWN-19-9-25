@@ -14,6 +14,9 @@ import uuid
 import time
 import logging
 
+# DAWN singleton integration
+from dawn.core.singleton import get_dawn
+
 logger = logging.getLogger(__name__)
 
 
@@ -75,6 +78,8 @@ class BaseTracer(ABC):
     Each tracer embodies a specific biological metaphor and implements
     specialized cognitive monitoring functions with distinct lifecycles,
     costs, and behaviors.
+    
+    Now includes DAWN singleton integration for unified system access.
     """
     
     def __init__(self, tracer_id: str = None):
@@ -86,6 +91,12 @@ class BaseTracer(ABC):
         self.total_nutrient_consumed = 0.0
         self.reports: List[TracerReport] = []
         self.spawn_context = {}
+        
+        # DAWN singleton integration
+        self._dawn = None
+        self._consciousness_bus = None
+        self._telemetry_system = None
+        self._initialize_dawn_integration()
         
     @property
     @abstractmethod
@@ -179,6 +190,82 @@ class BaseTracer(ABC):
             return 0
         return current_tick - self.spawn_tick
     
+    def _initialize_dawn_integration(self):
+        """Initialize integration with DAWN singleton"""
+        try:
+            self._dawn = get_dawn()
+            
+            if self._dawn.is_initialized:
+                self._consciousness_bus = self._dawn.consciousness_bus
+                self._telemetry_system = self._dawn.telemetry_system
+                
+                if self._consciousness_bus:
+                    # Register tracer with consciousness bus
+                    self._consciousness_bus.register_module(
+                        f'tracer_{self.tracer_id}',
+                        self,
+                        capabilities=['cognitive_monitoring', 'anomaly_detection']
+                    )
+                
+                if self._telemetry_system:
+                    # Log tracer creation
+                    self._telemetry_system.log_event(
+                        'tracer_created',
+                        {
+                            'tracer_id': self.tracer_id,
+                            'tracer_type': self.tracer_type.value if hasattr(self, 'tracer_type') else 'unknown',
+                            'archetype': self.archetype_description if hasattr(self, 'archetype_description') else 'unknown'
+                        }
+                    )
+                    
+        except Exception as e:
+            logger.debug(f"Could not initialize DAWN integration for tracer {self.tracer_id}: {e}")
+    
+    @property
+    def dawn(self):
+        """Get DAWN singleton instance"""
+        if self._dawn is None:
+            self._dawn = get_dawn()
+        return self._dawn
+    
+    @property
+    def consciousness_bus(self):
+        """Get consciousness bus instance"""
+        if self._consciousness_bus is None and self.dawn.is_initialized:
+            self._consciousness_bus = self.dawn.consciousness_bus
+        return self._consciousness_bus
+    
+    @property
+    def telemetry_system(self):
+        """Get telemetry system instance"""
+        if self._telemetry_system is None and self.dawn.is_initialized:
+            self._telemetry_system = self.dawn.telemetry_system
+        return self._telemetry_system
+    
+    def log_to_telemetry(self, event_type: str, data: Dict[str, Any]):
+        """Log event to telemetry system if available"""
+        if self.telemetry_system:
+            try:
+                self.telemetry_system.log_event(event_type, {
+                    'tracer_id': self.tracer_id,
+                    'tracer_type': self.tracer_type.value,
+                    **data
+                })
+            except Exception as e:
+                logger.debug(f"Failed to log telemetry for tracer {self.tracer_id}: {e}")
+    
+    def broadcast_to_consciousness(self, message_type: str, data: Dict[str, Any]):
+        """Broadcast message to consciousness bus if available"""
+        if self.consciousness_bus:
+            try:
+                self.consciousness_bus.broadcast_message(message_type, {
+                    'source_tracer': self.tracer_id,
+                    'tracer_type': self.tracer_type.value,
+                    **data
+                })
+            except Exception as e:
+                logger.debug(f"Failed to broadcast to consciousness for tracer {self.tracer_id}: {e}")
+    
     def get_status_info(self) -> Dict[str, Any]:
         """Get comprehensive status information"""
         return {
@@ -190,7 +277,12 @@ class BaseTracer(ABC):
             "current_nutrient_cost": self.current_nutrient_cost,
             "total_nutrient_consumed": self.total_nutrient_consumed,
             "report_count": len(self.reports),
-            "archetype": self.archetype_description
+            "archetype": self.archetype_description,
+            "dawn_integration": {
+                "dawn_connected": self._dawn is not None,
+                "consciousness_bus_connected": self._consciousness_bus is not None,
+                "telemetry_connected": self._telemetry_system is not None
+            }
         }
 
 

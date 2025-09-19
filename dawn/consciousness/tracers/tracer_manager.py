@@ -3,6 +3,8 @@ Tracer Manager for DAWN consciousness system.
 
 Manages the complete tracer ecosystem including spawning, monitoring,
 retirement, and nutrient budget allocation.
+
+Now includes DAWN singleton integration for unified system coordination.
 """
 
 from typing import Dict, List, Type, Any, Optional, Tuple
@@ -10,6 +12,9 @@ from collections import defaultdict, deque
 import logging
 import time
 from .base_tracer import BaseTracer, TracerType, TracerStatus, TracerReport
+
+# DAWN singleton integration
+from dawn.core.singleton import get_dawn
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +86,7 @@ class TracerManager:
     - Enforcing rate limits and safeguards
     - Nutrient budget allocation and recycling
     - Ecosystem metrics and telemetry
+    - DAWN singleton integration for system coordination
     """
     
     def __init__(self, nutrient_budget: float = 100.0):
@@ -90,6 +96,13 @@ class TracerManager:
         self.current_nutrient_usage = 0.0
         self.recycled_energy_pool = 0.0
         self.metrics = TracerEcosystemMetrics()
+        
+        # DAWN singleton integration
+        self._dawn = None
+        self._consciousness_bus = None
+        self._telemetry_system = None
+        self._cuda_tracer_engine = None
+        self._initialize_dawn_integration()
         
         # Rate limits per tick (flood protection)
         self.rate_limits = {
@@ -111,11 +124,87 @@ class TracerManager:
         }
         
         self.last_spawn_tick = defaultdict(int)
+    
+    def _initialize_dawn_integration(self):
+        """Initialize integration with DAWN singleton"""
+        try:
+            self._dawn = get_dawn()
+            
+            if self._dawn.is_initialized:
+                self._consciousness_bus = self._dawn.consciousness_bus
+                self._telemetry_system = self._dawn.telemetry_system
+                
+                if self._consciousness_bus:
+                    # Register tracer manager with consciousness bus
+                    self._consciousness_bus.register_module(
+                        'tracer_manager',
+                        self,
+                        capabilities=['tracer_ecosystem_management', 'cognitive_monitoring_coordination']
+                    )
+                    logger.info("✅ TracerManager registered with consciousness bus")
+                
+                if self._telemetry_system:
+                    # Register telemetry metrics
+                    self._telemetry_system.register_metric_source(
+                        'tracer_ecosystem',
+                        self._get_telemetry_metrics
+                    )
+                    logger.info("✅ TracerManager telemetry registered")
+                
+                # Initialize CUDA tracer engine if available
+                try:
+                    from .cuda_tracer_engine import get_cuda_tracer_engine
+                    self._cuda_tracer_engine = get_cuda_tracer_engine()
+                    logger.info("✅ CUDA tracer engine integrated")
+                except ImportError:
+                    logger.debug("CUDA tracer engine not available")
+                    
+        except Exception as e:
+            logger.debug(f"Could not initialize DAWN integration for TracerManager: {e}")
+    
+    @property
+    def dawn(self):
+        """Get DAWN singleton instance"""
+        if self._dawn is None:
+            self._dawn = get_dawn()
+        return self._dawn
+    
+    @property
+    def consciousness_bus(self):
+        """Get consciousness bus instance"""
+        if self._consciousness_bus is None and self.dawn.is_initialized:
+            self._consciousness_bus = self.dawn.consciousness_bus
+        return self._consciousness_bus
+    
+    @property
+    def telemetry_system(self):
+        """Get telemetry system instance"""
+        if self._telemetry_system is None and self.dawn.is_initialized:
+            self._telemetry_system = self.dawn.telemetry_system
+        return self._telemetry_system
+    
+    @property
+    def cuda_tracer_engine(self):
+        """Get CUDA tracer engine instance"""
+        if self._cuda_tracer_engine is None:
+            try:
+                from .cuda_tracer_engine import get_cuda_tracer_engine
+                self._cuda_tracer_engine = get_cuda_tracer_engine()
+            except ImportError:
+                pass
+        return self._cuda_tracer_engine
         
     def register_tracer_class(self, tracer_type: TracerType, tracer_class: Type[BaseTracer]):
         """Register a tracer implementation"""
         self.tracer_classes[tracer_type] = tracer_class
         logger.info(f"Registered tracer class: {tracer_type.value}")
+        
+        # Log to telemetry if available
+        if self.telemetry_system:
+            self.telemetry_system.log_event('tracer_class_registered', {
+                'tracer_type': tracer_type.value,
+                'class_name': tracer_class.__name__
+            })
         
     def get_available_budget(self) -> float:
         """Get current available nutrient budget including recycled energy"""
@@ -351,3 +440,138 @@ class TracerManager:
                       f"recovered {recovery_info['energy_recovered']:.3f} energy")
                       
         return recovery_info
+    
+    def _get_telemetry_metrics(self) -> Dict[str, Any]:
+        """Get telemetry metrics for DAWN integration"""
+        return {
+            'tracer_ecosystem': {
+                'active_tracers': len(self.active_tracers),
+                'nutrient_budget': self.nutrient_budget,
+                'current_usage': self.current_nutrient_usage,
+                'recycled_energy': self.recycled_energy_pool,
+                'budget_utilization': self.current_nutrient_usage / self.nutrient_budget,
+                'metrics_summary': self.metrics.get_summary(),
+                'cuda_integration': {
+                    'cuda_engine_available': self.cuda_tracer_engine is not None,
+                    'gpu_simulation_active': (
+                        self.cuda_tracer_engine.simulation_running 
+                        if self.cuda_tracer_engine else False
+                    )
+                }
+            }
+        }
+    
+    def initialize_cuda_simulation(self) -> bool:
+        """Initialize CUDA simulation with current active tracers"""
+        if not self.cuda_tracer_engine:
+            logger.warning("CUDA tracer engine not available")
+            return False
+        
+        try:
+            active_tracer_list = list(self.active_tracers.values())
+            if self.cuda_tracer_engine.initialize_gpu_state(active_tracer_list):
+                logger.info(f"✅ CUDA simulation initialized with {len(active_tracer_list)} tracers")
+                
+                # Log to telemetry
+                if self.telemetry_system:
+                    self.telemetry_system.log_event('cuda_simulation_initialized', {
+                        'tracer_count': len(active_tracer_list),
+                        'gpu_memory_used': self.cuda_tracer_engine._get_gpu_memory_usage()
+                    })
+                
+                return True
+            else:
+                logger.error("Failed to initialize CUDA simulation")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error initializing CUDA simulation: {e}")
+            return False
+    
+    def start_cuda_simulation(self, fps: float = 30.0) -> bool:
+        """Start continuous CUDA simulation"""
+        if not self.cuda_tracer_engine:
+            logger.warning("CUDA tracer engine not available")
+            return False
+        
+        try:
+            # Initialize if not already done
+            if not self.cuda_tracer_engine.gpu_arrays:
+                if not self.initialize_cuda_simulation():
+                    return False
+            
+            # Start simulation
+            self.cuda_tracer_engine.start_continuous_simulation(fps)
+            
+            # Log to telemetry
+            if self.telemetry_system:
+                self.telemetry_system.log_event('cuda_simulation_started', {
+                    'fps': fps,
+                    'tracer_count': len(self.active_tracers)
+                })
+            
+            # Broadcast to consciousness
+            if self.consciousness_bus:
+                self.consciousness_bus.broadcast_message('cuda_simulation_started', {
+                    'fps': fps,
+                    'tracer_count': len(self.active_tracers),
+                    'ecosystem_state': 'gpu_accelerated'
+                })
+            
+            logger.info(f"🚀 Started CUDA tracer simulation at {fps} FPS")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error starting CUDA simulation: {e}")
+            return False
+    
+    def stop_cuda_simulation(self):
+        """Stop CUDA simulation"""
+        if self.cuda_tracer_engine:
+            self.cuda_tracer_engine.stop_continuous_simulation()
+            
+            # Log to telemetry
+            if self.telemetry_system:
+                self.telemetry_system.log_event('cuda_simulation_stopped', {})
+            
+            # Broadcast to consciousness
+            if self.consciousness_bus:
+                self.consciousness_bus.broadcast_message('cuda_simulation_stopped', {
+                    'ecosystem_state': 'cpu_mode'
+                })
+            
+            logger.info("🛑 Stopped CUDA tracer simulation")
+    
+    def get_cuda_simulation_status(self) -> Dict[str, Any]:
+        """Get CUDA simulation status and metrics"""
+        if not self.cuda_tracer_engine:
+            return {'cuda_available': False}
+        
+        return {
+            'cuda_available': True,
+            'simulation_running': self.cuda_tracer_engine.simulation_running,
+            'simulation_step': self.cuda_tracer_engine.simulation_step,
+            'performance_metrics': self.cuda_tracer_engine.performance_metrics.copy(),
+            'ecosystem_summary': self.cuda_tracer_engine.get_ecosystem_summary()
+        }
+    
+    def sync_tracers_with_cuda(self):
+        """Synchronize active tracers with CUDA simulation"""
+        if not self.cuda_tracer_engine or not self.cuda_tracer_engine.gpu_arrays:
+            return
+        
+        try:
+            # Get current positions from GPU
+            gpu_positions = self.cuda_tracer_engine.get_tracer_positions()
+            
+            # Update tracer metadata with GPU positions
+            for tracer_id, position in gpu_positions.items():
+                if tracer_id in self.active_tracers:
+                    tracer = self.active_tracers[tracer_id]
+                    tracer.spawn_context['gpu_position'] = position
+                    tracer.spawn_context['gpu_synchronized'] = True
+            
+            logger.debug(f"Synchronized {len(gpu_positions)} tracers with CUDA simulation")
+            
+        except Exception as e:
+            logger.error(f"Error synchronizing tracers with CUDA: {e}")

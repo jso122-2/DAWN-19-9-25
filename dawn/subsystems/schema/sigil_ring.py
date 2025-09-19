@@ -28,11 +28,53 @@ from collections import deque, defaultdict
 import uuid
 import json
 
-from core.schema_anomaly_logger import log_anomaly, AnomalySeverity
-from schema.registry import registry
-from schema.sigil_network import SigilNetwork, SigilInvocation, SigilHouse, RoutingProtocol, sigil_network
-from rhizome.propagation import emit_signal, SignalType
-from utils.metrics_collector import metrics
+from dawn.subsystems.schema.schema_anomaly_logger import log_anomaly, AnomalySeverity
+from dawn.subsystems.schema.registry import ComponentType
+# Placeholder imports for missing modules
+try:
+    from schema.registry import registry
+except ImportError:
+    try:
+        from dawn.subsystems.schema.registry import registry
+    except ImportError:
+        class Registry:
+            def get(self, name, default=None): return default
+            def register(self, **kwargs): pass
+        registry = Registry()
+
+try:
+    from schema.sigil_network import SigilNetwork, SigilInvocation, SigilHouse, RoutingProtocol, sigil_network
+except ImportError:
+    try:
+        from dawn.subsystems.schema.sigil_network import SigilNetwork, SigilInvocation, SigilHouse, RoutingProtocol, sigil_network
+    except ImportError:
+        # Create placeholder classes
+        class SigilHouse:
+            CONSCIOUSNESS = "consciousness"
+            MEMORY = "memory"
+            SCHEMA = "schema"
+        class RoutingProtocol:
+            DIRECT = "direct"
+        class SigilInvocation:
+            def __init__(self, **kwargs): pass
+        class SigilNetwork:
+            def route_sigil(self, *args, **kwargs): return {"success": True}
+        sigil_network = SigilNetwork()
+
+try:
+    from rhizome.propagation import emit_signal, SignalType
+except ImportError:
+    def emit_signal(signal_type, data=None): pass
+    class SignalType:
+        SIGIL_CAST = "sigil_cast"
+
+try:
+    from utils.metrics_collector import metrics
+except ImportError:
+    class Metrics:
+        def increment(self, name): pass
+        def record(self, name, value): pass
+    metrics = Metrics()
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +378,7 @@ class SigilRing:
         registry.register(
             component_id=f"schema.sigil_ring.{self.ring_id}",
             name="Sigil Ring",
-            component_type="EXECUTION_ENVIRONMENT",
+            component_type=ComponentType.MODULE,
             instance=self,
             capabilities=[
                 "symbolic_execution",

@@ -15,7 +15,7 @@ from datetime import datetime
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from dawn_core.state import get_state, set_state
+from dawn.core.foundation.state import get_state, set_state
 
 # Create snapshots directory
 SNAP_DIR = pathlib.Path("runtime/snapshots")

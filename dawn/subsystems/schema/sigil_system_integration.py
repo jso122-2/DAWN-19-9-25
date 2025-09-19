@@ -16,75 +16,185 @@ import logging
 import asyncio
 from typing import Dict, List, Optional, Set, Tuple, Any, Union
 
-from core.schema_anomaly_logger import log_anomaly, AnomalySeverity
-from schema.registry import registry
-from rhizome.propagation import emit_signal, SignalType
-from utils.metrics_collector import metrics
+# Optional external imports - gracefully handle missing dependencies
+try:
+    from core.schema_anomaly_logger import log_anomaly, AnomalySeverity
+except ImportError:
+    def log_anomaly(*args, **kwargs): pass
+    class AnomalySeverity:
+        LOW = "low"
+        MEDIUM = "medium"
+        HIGH = "high"
 
-# Import all sigil system components
-from sigil_glyph_codex import (
-    sigil_glyph_codex, 
-    SigilGlyph, 
-    GlyphCategory, 
-    SigilHouse,
-    get_glyph,
-    validate_layering,
-    resolve_layered_meaning
-)
+try:
+    from schema.registry import registry
+except ImportError:
+    registry = None
 
-from enhanced_sigil_ring import (
-    enhanced_sigil_ring,
-    InvokerPriority,
-    ContainmentLevel,
-    RingState
-)
+try:
+    from rhizome.propagation import emit_signal, SignalType
+except ImportError:
+    def emit_signal(*args, **kwargs): pass
+    class SignalType:
+        SIGIL_ACTIVATION = "sigil_activation"
 
-from sigil_network import (
-    sigil_network,
-    SigilInvocation
-)
+try:
+    from utils.metrics_collector import metrics
+except ImportError:
+    class MockMetrics:
+        def increment(self, *args, **kwargs): pass
+        def gauge(self, *args, **kwargs): pass
+        def timer(self, *args, **kwargs): pass
+    metrics = MockMetrics()
 
-from archetypal_house_operations import (
-    HOUSE_OPERATORS,
-    execute_house_operation,
-    memory_house,
-    purification_house,
-    weaving_house,
-    flame_house,
-    mirrors_house,
-    echoes_house
-)
+# Import all sigil system components - with graceful fallbacks
+try:
+    from sigil_glyph_codex import (
+        sigil_glyph_codex, 
+        SigilGlyph, 
+        GlyphCategory, 
+        SigilHouse,
+        get_glyph,
+        validate_layering,
+        resolve_layered_meaning
+    )
+    SIGIL_GLYPH_CODEX_AVAILABLE = True
+except ImportError:
+    SIGIL_GLYPH_CODEX_AVAILABLE = False
+    sigil_glyph_codex = None
+    
+    # Create fallback enums and functions
+    from enum import Enum
+    class SigilHouse(Enum):
+        MEMORY = "memory"
+        PURIFICATION = "purification"
+        WEAVING = "weaving"
+        FLAME = "flame"
+        MIRRORS = "mirrors"
+        ECHOES = "echoes"
+    
+    class GlyphCategory(Enum):
+        CORE = "core"
+        EXTENDED = "extended"
+        SPECIALIZED = "specialized"
+    
+    def get_glyph(*args, **kwargs): return None
+    def validate_layering(*args, **kwargs): return True
+    def resolve_layered_meaning(*args, **kwargs): return ""
 
-from tracer_house_alignment import (
-    tracer_house_alignment,
-    TracerType,
-    register_tracer,
-    align_tracer,
-    release_tracer,
-    get_alignment_status
-)
+try:
+    from enhanced_sigil_ring import (
+        enhanced_sigil_ring,
+        InvokerPriority,
+        ContainmentLevel,
+        RingState
+    )
+    ENHANCED_SIGIL_RING_AVAILABLE = True
+except ImportError:
+    ENHANCED_SIGIL_RING_AVAILABLE = False
+    enhanced_sigil_ring = None
+    
+    # Create fallback enums
+    from enum import Enum
+    class InvokerPriority(Enum):
+        SYSTEM = "system"
+        OPERATOR = "operator" 
+        USER = "user"
+        BACKGROUND = "background"
+    
+    class ContainmentLevel(Enum):
+        MINIMAL = "minimal"
+        STANDARD = "standard"
+        ENHANCED = "enhanced"
+        MAXIMUM = "maximum"
+    
+    class RingState(Enum):
+        DORMANT = "dormant"
+        ACTIVE = "active"
+        CONTAINMENT = "containment"
+        EMERGENCY = "emergency"
 
-from symbolic_failure_detection import (
-    symbolic_failure_detector,
-    start_failure_monitoring,
-    stop_failure_monitoring,
-    get_active_failures,
-    get_failure_summary
-)
+try:
+    from sigil_network import (
+        sigil_network,
+        SigilInvocation
+    )
+    SIGIL_NETWORK_AVAILABLE = True
+except ImportError:
+    SIGIL_NETWORK_AVAILABLE = False
+    sigil_network = None
 
-from sigil_ring_visualization import (
-    sigil_ring_visualization,
-    VisualizationTheme,
-    generate_visual_ring,
-    set_visualization_theme,
-    get_gui_frame_data
-)
+try:
+    from archetypal_house_operations import (
+        HOUSE_OPERATORS,
+        execute_house_operation,
+        memory_house,
+        purification_house,
+        weaving_house,
+        flame_house,
+        mirrors_house,
+        echoes_house
+    )
+    ARCHETYPAL_HOUSE_OPERATIONS_AVAILABLE = True
+except ImportError:
+    ARCHETYPAL_HOUSE_OPERATIONS_AVAILABLE = False
+    HOUSE_OPERATORS = {}
+    
+    # Create fallback function
+    def execute_house_operation(house, operation, params=None):
+        """Fallback house operation executor"""
+        class MockResult:
+            def __init__(self):
+                self.result_data = {'sigils': []}
+                self.success = False
+        return MockResult()
 
-from sigil_system_test_vectors import (
-    sigil_system_test_runner,
-    run_all_sigil_tests,
-    generate_test_report
-)
+try:
+    from tracer_house_alignment import (
+        tracer_house_alignment,
+        TracerType,
+        register_tracer,
+        align_tracer,
+        release_tracer,
+        get_alignment_status
+    )
+    TRACER_HOUSE_ALIGNMENT_AVAILABLE = True
+except ImportError:
+    TRACER_HOUSE_ALIGNMENT_AVAILABLE = False
+
+try:
+    from symbolic_failure_detection import (
+        symbolic_failure_detector,
+        start_failure_monitoring,
+        stop_failure_monitoring,
+        get_active_failures,
+        get_failure_summary
+    )
+    SYMBOLIC_FAILURE_DETECTION_AVAILABLE = True
+except ImportError:
+    SYMBOLIC_FAILURE_DETECTION_AVAILABLE = False
+
+try:
+    from sigil_ring_visualization import (
+        sigil_ring_visualization,
+        VisualizationTheme,
+        generate_visual_ring,
+        set_visualization_theme,
+        get_gui_frame_data
+    )
+    SIGIL_RING_VISUALIZATION_AVAILABLE = True
+except ImportError:
+    SIGIL_RING_VISUALIZATION_AVAILABLE = False
+
+try:
+    from sigil_system_test_vectors import (
+        sigil_system_test_runner,
+        run_all_sigil_tests,
+        generate_test_report
+    )
+    SIGIL_SYSTEM_TEST_VECTORS_AVAILABLE = True
+except ImportError:
+    SIGIL_SYSTEM_TEST_VECTORS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 

@@ -125,6 +125,9 @@ class WhaleTracer(BaseTracer):
             # Final synthesis phase
             synthesis = self._synthesize_insights(context)
             if synthesis:
+                recommendations = self._generate_recommendations(synthesis)
+                confidence = self._calculate_confidence_score()
+                
                 reports.append(TracerReport(
                     tracer_id=self.tracer_id,
                     tracer_type=self.tracer_type,
@@ -136,11 +139,34 @@ class WhaleTracer(BaseTracer):
                         "scope": "macro_trends",
                         "tick_window": [self.spawn_tick, current_tick],
                         "synthesis": synthesis,
-                        "recommendations": self._generate_recommendations(synthesis),
-                        "confidence": self._calculate_confidence_score()
+                        "recommendations": recommendations,
+                        "confidence": confidence
                     }
                 ))
                 self.insights_generated.append(synthesis)
+                
+                # Log deep insights to telemetry
+                self.log_to_telemetry('whale_deep_synthesis', {
+                    'analysis_phase': self.analysis_phase,
+                    'confidence_score': confidence,
+                    'recommendations_count': len(recommendations),
+                    'synthesis_scope': 'macro_trends',
+                    'tick_window_duration': current_tick - self.spawn_tick
+                })
+                
+                # Broadcast high-confidence insights to consciousness
+                if confidence > 0.7:
+                    self.broadcast_to_consciousness('deep_insights_available', {
+                        'confidence': confidence,
+                        'recommendations': recommendations,
+                        'synthesis_summary': {
+                            'system_health': synthesis.get('system_health', {}),
+                            'predictive_indicators': synthesis.get('predictive_indicators', {})
+                        },
+                        'requires_system_attention': any(
+                            rec.get('priority') == 'critical' for rec in recommendations
+                        )
+                    })
         
         return reports
     

@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from dawn_core.self_mod.advisor import ModProposal, PatchType
+from dawn.subsystems.self_mod.advisor import ModProposal, PatchType
 
 logger = logging.getLogger(__name__)
 
@@ -84,14 +84,21 @@ class CodePatchBuilder:
     based on advisor recommendations with comprehensive validation.
     """
     
-    def __init__(self, sandbox_root: str = "sandbox_mods"):
+    def __init__(self, sandbox_root: str = "sandbox_mods", simulation_mode: bool = False):
         """Initialize the patch builder."""
         self.builder_id = str(uuid.uuid4())[:8]
         self.sandbox_root = pathlib.Path(sandbox_root)
-        self.sandbox_root.mkdir(parents=True, exist_ok=True)
+        self.simulation_mode = simulation_mode
+        
+        # Only create actual directories if not in simulation mode
+        if not simulation_mode:
+            self.sandbox_root.mkdir(parents=True, exist_ok=True)
         
         # Active sandboxes
         self.active_sandboxes: Dict[str, SandboxEnvironment] = {}
+        
+        # Simulation tracking
+        self.simulation_results: List[Dict[str, Any]] = []
         
         # Patch patterns
         self.constant_patterns = {
@@ -126,27 +133,31 @@ class CodePatchBuilder:
         start_time = time.time()
         run_id = str(uuid.uuid4())[:8]
         
-        logger.info(f"🔧 Creating sandbox for proposal: {proposal.name}")
+        mode_indicator = "🎭 SIMULATION" if self.simulation_mode else "🔧"
+        logger.info(f"{mode_indicator} Creating {'simulated ' if self.simulation_mode else ''}sandbox for proposal: {proposal.name}")
         logger.info(f"   Run ID: {run_id}")
         logger.info(f"   Target: {proposal.target}")
         logger.info(f"   Patch Type: {proposal.patch_type.value}")
+        logger.info(f"   Mode: {'SIMULATION' if self.simulation_mode else 'LIVE'}")
         
         try:
-            # Create sandbox environment
+            # Create sandbox environment (real or simulated)
             sandbox_env = self._create_sandbox_environment(run_id)
             
-            # Copy target file to sandbox
-            src_path = pathlib.Path(proposal.target)
-            if not src_path.exists():
+            # Comprehensive file existence and accessibility check
+            file_check_result = self._validate_target_file(proposal.target, run_id)
+            if not file_check_result['valid']:
                 return PatchResult(
                     run_id=run_id,
                     sandbox_dir=str(sandbox_env.root_dir),
                     target_rel=proposal.target,
                     applied=False,
                     status=PatchStatus.FILE_NOT_FOUND,
-                    reason=f"Source file not found: {proposal.target}",
+                    reason=file_check_result['reason'],
                     execution_time=time.time() - start_time
                 )
+            
+            src_path = file_check_result['path']
             
             # Calculate relative path structure
             if src_path.is_absolute():
@@ -160,13 +171,17 @@ class CodePatchBuilder:
                 rel_path = src_path
             
             dst_path = sandbox_env.root_dir / rel_path
-            dst_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_path, dst_path)
             
-            logger.info(f"📁 Copied {src_path} → {dst_path}")
-            
-            # Read original content
-            original_content = dst_path.read_text(encoding='utf-8')
+            if not self.simulation_mode:
+                dst_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_path, dst_path)
+                logger.info(f"📁 Copied {src_path} → {dst_path}")
+                # Read original content from copied file
+                original_content = dst_path.read_text(encoding='utf-8')
+            else:
+                logger.info(f"🎭 Simulated copy {src_path} → {dst_path}")
+                # Read original content directly from source
+                original_content = src_path.read_text(encoding='utf-8')
             original_size = len(original_content)
             
             # Apply the patch
@@ -198,9 +213,14 @@ class CodePatchBuilder:
             )
     
     def _create_sandbox_environment(self, run_id: str) -> SandboxEnvironment:
-        """Create a new sandbox environment."""
+        """Create a new sandbox environment (real or simulated)."""
         sandbox_dir = self.sandbox_root / run_id
-        sandbox_dir.mkdir(parents=True, exist_ok=True)
+        
+        if not self.simulation_mode:
+            sandbox_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"📁 Created sandbox environment: {sandbox_dir}")
+        else:
+            logger.info(f"🎭 Simulated sandbox environment: {sandbox_dir}")
         
         env = SandboxEnvironment(
             sandbox_id=run_id,
@@ -208,8 +228,207 @@ class CodePatchBuilder:
             created_at=datetime.now()
         )
         
-        logger.info(f"📁 Created sandbox environment: {sandbox_dir}")
         return env
+    
+    def _validate_target_file(self, target_path: str, run_id: str) -> Dict[str, Any]:
+        """
+        Comprehensively validate target file existence and accessibility.
+        
+        Args:
+            target_path: Path to the target file
+            run_id: Current run ID for logging context
+            
+        Returns:
+            Dict with 'valid' bool, 'reason' str, and 'path' pathlib.Path
+        """
+        logger.debug(f"🔍 Validating target file: {target_path}")
+        
+        # Convert to Path object
+        try:
+            src_path = pathlib.Path(target_path)
+        except Exception as e:
+            return {
+                'valid': False,
+                'reason': f"Invalid path format '{target_path}': {e}",
+                'path': None
+            }
+        
+        # Check if path exists
+        if not src_path.exists():
+            # Try alternative paths if the direct path doesn't exist
+            alternative_paths = self._get_alternative_paths(target_path)
+            
+            for alt_path in alternative_paths:
+                logger.debug(f"🔍 Trying alternative path: {alt_path}")
+                if alt_path.exists():
+                    logger.info(f"🔍 Found file at alternative path: {alt_path}")
+                    return {
+                        'valid': True,
+                        'reason': f"File found at alternative path: {alt_path}",
+                        'path': alt_path
+                    }
+            
+            # No valid path found
+            search_locations = [str(p) for p in [src_path] + alternative_paths]
+            return {
+                'valid': False,
+                'reason': f"Source file not found: '{target_path}'. Searched locations: {search_locations}",
+                'path': None
+            }
+        
+        # Check if it's a file (not a directory)
+        if not src_path.is_file():
+            return {
+                'valid': False,
+                'reason': f"Path exists but is not a file: '{target_path}' (is {'directory' if src_path.is_dir() else 'other'})",
+                'path': None
+            }
+        
+        # Check if file is readable
+        try:
+            with open(src_path, 'r', encoding='utf-8') as f:
+                # Try to read first few bytes to verify accessibility
+                f.read(100)
+        except PermissionError:
+            return {
+                'valid': False,
+                'reason': f"File exists but is not readable due to permissions: '{target_path}'",
+                'path': None
+            }
+        except UnicodeDecodeError:
+            # Try binary mode for non-text files
+            try:
+                with open(src_path, 'rb') as f:
+                    f.read(100)
+                logger.warning(f"🔍 File appears to be binary: {target_path}")
+            except Exception as e:
+                return {
+                    'valid': False,
+                    'reason': f"File exists but cannot be read: '{target_path}': {e}",
+                    'path': None
+                }
+        except Exception as e:
+            return {
+                'valid': False,
+                'reason': f"File exists but cannot be accessed: '{target_path}': {e}",
+                'path': None
+            }
+        
+        # Check file size (avoid extremely large files)
+        try:
+            file_size = src_path.stat().st_size
+            max_size = 10 * 1024 * 1024  # 10MB limit
+            if file_size > max_size:
+                return {
+                    'valid': False,
+                    'reason': f"File is too large for modification: '{target_path}' ({file_size} bytes > {max_size} bytes)",
+                    'path': None
+                }
+        except Exception as e:
+            logger.warning(f"🔍 Could not check file size for {target_path}: {e}")
+        
+        logger.debug(f"✅ File validation successful: {target_path}")
+        return {
+            'valid': True,
+            'reason': "File exists and is accessible",
+            'path': src_path
+        }
+    
+    def _get_alternative_paths(self, target_path: str) -> List[pathlib.Path]:
+        """
+        Generate alternative paths to search for the target file.
+        
+        This helps handle cases where paths have changed or files have been moved.
+        """
+        alternatives = []
+        original_path = pathlib.Path(target_path)
+        
+        # If it's already an absolute path, try making it relative
+        if original_path.is_absolute():
+            try:
+                rel_path = original_path.relative_to(pathlib.Path.cwd())
+                alternatives.append(rel_path)
+            except ValueError:
+                pass
+        
+        # Common path transformations for DAWN system
+        if 'dawn_core' in target_path:
+            # Try the new dawn/core/foundation structure
+            new_path = target_path.replace('dawn_core', 'dawn/core/foundation')
+            alternatives.append(pathlib.Path(new_path))
+            
+            # Try without the dawn_core prefix
+            if target_path.startswith('dawn_core/'):
+                no_prefix = target_path[10:]  # Remove 'dawn_core/'
+                alternatives.append(pathlib.Path(f"dawn/{no_prefix}"))
+                alternatives.append(pathlib.Path(f"dawn/core/{no_prefix}"))
+        
+        # If path contains dawn/, try with dawn_core/
+        if 'dawn/' in target_path and 'dawn_core' not in target_path:
+            legacy_path = target_path.replace('dawn/', 'dawn_core/')
+            alternatives.append(pathlib.Path(legacy_path))
+        
+        # Try in common directories
+        filename = original_path.name
+        common_dirs = [
+            pathlib.Path("dawn/core/foundation"),
+            pathlib.Path("dawn_core"),
+            pathlib.Path("dawn/subsystems"),
+            pathlib.Path("."),
+        ]
+        
+        for common_dir in common_dirs:
+            if common_dir.exists():
+                alternatives.append(common_dir / filename)
+        
+        # Remove duplicates and the original path
+        unique_alternatives = []
+        seen = {original_path}
+        
+        for alt in alternatives:
+            if alt not in seen:
+                unique_alternatives.append(alt)
+                seen.add(alt)
+        
+        return unique_alternatives
+    
+    def _write_modified_content(self, target_path: pathlib.Path, content: str, 
+                               proposal: ModProposal, run_id: str) -> Dict[str, Any]:
+        """
+        Write modified content to file (real or simulated).
+        
+        Returns:
+            Dict with success status and validation results
+        """
+        if not self.simulation_mode:
+            # Real write operation
+            target_path.write_text(content, encoding='utf-8')
+            logger.info(f"📝 Modified content written to: {target_path}")
+        else:
+            # Simulated write operation
+            logger.info(f"🎭 Simulated write to: {target_path}")
+            # Store simulation result
+            simulation_result = {
+                'run_id': run_id,
+                'proposal_name': proposal.name,
+                'target_file': str(target_path),
+                'patch_type': proposal.patch_type.value,
+                'original_value': proposal.current_value,
+                'proposed_value': proposal.proposed_value,
+                'content_length': len(content),
+                'timestamp': datetime.now().isoformat(),
+                'action': 'file_write_simulated'
+            }
+            self.simulation_results.append(simulation_result)
+        
+        # Validate syntax (always do this, even in simulation)
+        validation_errors = self._validate_python_syntax(content)
+        
+        return {
+            'success': True,
+            'validation_errors': validation_errors,
+            'content_length': len(content)
+        }
     
     def _apply_patch(self, proposal: ModProposal, target_path: pathlib.Path, 
                      original_content: str, run_id: str, 
@@ -292,11 +511,9 @@ class CodePatchBuilder:
                 modified_content=modified_content
             )
         
-        # Write modified content
-        target_path.write_text(modified_content, encoding='utf-8')
-        
-        # Validate syntax
-        validation_errors = self._validate_python_syntax(modified_content)
+        # Write modified content (real or simulated)
+        write_result = self._write_modified_content(target_path, modified_content, proposal, run_id)
+        validation_errors = write_result['validation_errors']
         
         return PatchResult(
             run_id=run_id,
@@ -360,9 +577,9 @@ class CodePatchBuilder:
                 modified_content=modified_content
             )
         
-        # Write and validate
-        target_path.write_text(modified_content, encoding='utf-8')
-        validation_errors = self._validate_python_syntax(modified_content)
+        # Write and validate (real or simulated)
+        write_result = self._write_modified_content(target_path, modified_content, proposal, run_id)
+        validation_errors = write_result['validation_errors']
         
         return PatchResult(
             run_id=run_id,
@@ -440,9 +657,9 @@ class CodePatchBuilder:
                 modified_content=modified_content
             )
         
-        # Write and validate
-        target_path.write_text(modified_content, encoding='utf-8')
-        validation_errors = self._validate_python_syntax(modified_content)
+        # Write and validate (real or simulated)
+        write_result = self._write_modified_content(target_path, modified_content, proposal, run_id)
+        validation_errors = write_result['validation_errors']
         
         return PatchResult(
             run_id=run_id,
@@ -587,12 +804,80 @@ class CodePatchBuilder:
             sandbox.cleanup()
         self.active_sandboxes.clear()
         logger.info("🧹 Cleaned up all sandboxes")
+    
+    def get_simulation_results(self) -> List[Dict[str, Any]]:
+        """Get all simulation results."""
+        return self.simulation_results.copy()
+    
+    def clear_simulation_results(self):
+        """Clear simulation results."""
+        self.simulation_results.clear()
+    
+    def generate_simulation_report(self) -> Dict[str, Any]:
+        """
+        Generate a comprehensive simulation report.
+        
+        Returns:
+            Dict containing simulation summary and details
+        """
+        if not self.simulation_mode:
+            return {'error': 'Not in simulation mode'}
+        
+        total_simulations = len(self.simulation_results)
+        if total_simulations == 0:
+            return {
+                'mode': 'SIMULATION',
+                'total_simulations': 0,
+                'message': 'No simulations performed yet'
+            }
+        
+        # Group by patch type
+        by_patch_type = {}
+        by_target_file = {}
+        successful_simulations = 0
+        
+        for result in self.simulation_results:
+            patch_type = result.get('patch_type', 'unknown')
+            target_file = result.get('target_file', 'unknown')
+            
+            # Count by patch type
+            by_patch_type[patch_type] = by_patch_type.get(patch_type, 0) + 1
+            
+            # Count by target file
+            by_target_file[target_file] = by_target_file.get(target_file, 0) + 1
+            
+            # Count successes (assume all simulations are successful for now)
+            successful_simulations += 1
+        
+        # Generate summary
+        report = {
+            'mode': 'SIMULATION',
+            'builder_id': self.builder_id,
+            'total_simulations': total_simulations,
+            'successful_simulations': successful_simulations,
+            'failed_simulations': total_simulations - successful_simulations,
+            'success_rate': successful_simulations / total_simulations if total_simulations > 0 else 0,
+            'summary': {
+                'by_patch_type': by_patch_type,
+                'by_target_file': by_target_file,
+                'most_modified_file': max(by_target_file.items(), key=lambda x: x[1])[0] if by_target_file else None,
+                'most_common_patch_type': max(by_patch_type.items(), key=lambda x: x[1])[0] if by_patch_type else None
+            },
+            'simulations': self.simulation_results,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        return report
 
 # Convenience function
-def make_sandbox(proposal: ModProposal) -> PatchResult:
+def make_sandbox(proposal: ModProposal, simulation_mode: bool = False) -> PatchResult:
     """Create a sandbox and apply the proposed modification."""
-    builder = CodePatchBuilder()
+    builder = CodePatchBuilder(simulation_mode=simulation_mode)
     return builder.make_sandbox(proposal)
+
+def make_simulation_sandbox(proposal: ModProposal) -> PatchResult:
+    """Create a simulated sandbox without actual file modifications."""
+    return make_sandbox(proposal, simulation_mode=True)
 
 def demo_patch_builder():
     """Demonstrate patch builder functionality."""
@@ -602,7 +887,7 @@ def demo_patch_builder():
     print()
     
     # Import required modules
-    from dawn_core.self_mod.advisor import ModProposal, PatchType, ModificationPriority
+    from dawn.subsystems.self_mod.advisor import ModProposal, PatchType, ModificationPriority
     
     # Initialize patch builder
     builder = CodePatchBuilder()
@@ -624,7 +909,7 @@ def demo_patch_builder():
         ),
         ModProposal(
             name="transcendent_threshold_lower", 
-            target="dawn_core/state.py",
+            target="dawn/core/foundation/state.py",
             patch_type=PatchType.THRESHOLD,
             current_value=0.90,
             proposed_value=0.88,

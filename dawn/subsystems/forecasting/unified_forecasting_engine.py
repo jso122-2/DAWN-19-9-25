@@ -571,6 +571,12 @@ class UnifiedForecastingEngine:
             window_size=self.config.get('backtest_window', 1000)
         )
         
+        # DAWN singleton integration
+        self.dawn_system = None
+        self.consciousness_bus = None
+        self.telemetry_system = None
+        self._initialize_dawn_integration()
+        
         # State tracking
         self.forecast_history: List[Dict[ForecastHorizon, ForecastResult]] = []
         self.smoothed_f_history: Dict[ForecastHorizon, deque] = {
@@ -587,6 +593,38 @@ class UnifiedForecastingEngine:
         self.update_lock = threading.RLock()
         
         logger.info("🔮 Unified Forecasting Engine initialized")
+    
+    def _initialize_dawn_integration(self) -> None:
+        """Initialize integration with DAWN singleton"""
+        try:
+            from dawn.core.singleton import get_dawn
+            self.dawn_system = get_dawn()
+            
+            # Get subsystems if available
+            if self.dawn_system.is_initialized():
+                self.consciousness_bus = self.dawn_system.consciousness_bus
+                self.telemetry_system = self.dawn_system.telemetry_system
+                
+                # Register with consciousness bus if available
+                if self.consciousness_bus:
+                    self.consciousness_bus.register_module(
+                        "unified_forecasting_engine",
+                        capabilities=["forecasting", "prediction", "active_inference"],
+                        state_schema={"forecast_f": "float", "stability_zone": "string"}
+                    )
+                    logger.info("🌅 Forecasting engine registered with DAWN singleton")
+                
+                # Log initialization to telemetry
+                if self.telemetry_system:
+                    self.telemetry_system.log_event(
+                        'forecasting', 'initialization', 'engine_initialized',
+                        data={'horizon_ticks': dict(self.horizon_ticks)}
+                    )
+            else:
+                logger.info("🔮 DAWN system not initialized, forecasting engine running standalone")
+                
+        except ImportError:
+            logger.warning("DAWN singleton not available, forecasting engine running standalone")
     
     def generate_forecast(self, inputs: SystemInputs) -> Dict[ForecastHorizon, ForecastResult]:
         """

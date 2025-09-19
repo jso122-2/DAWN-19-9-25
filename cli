@@ -1,0 +1,9 @@
+#!/bin/bash
+# DAWN Enhanced CLI Launcher
+# Quick launcher for the enhanced CLI interface
+
+cd "$(dirname "$0")"
+
+# Use the simple version by default to avoid logging spam
+# Use dawn_enhanced_cli.py for full features if needed
+python3 dawn_enhanced_cli_simple.py "$@"

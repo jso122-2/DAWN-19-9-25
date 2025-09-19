@@ -29,6 +29,24 @@ from .tracer_manager import (
     TracerEcosystemMetrics
 )
 
+# CUDA-powered tracer modeling and visualization
+try:
+    from .cuda_tracer_engine import (
+        CUDATracerModelingEngine,
+        CUDATracerModelConfig,
+        get_cuda_tracer_engine,
+        reset_cuda_tracer_engine
+    )
+    from .cuda_tracer_visualization import (
+        CUDATracerVisualizationEngine,
+        TracerVisualizationConfig,
+        get_cuda_tracer_visualization_engine,
+        reset_cuda_tracer_visualization_engine
+    )
+    CUDA_TRACER_AVAILABLE = True
+except ImportError:
+    CUDA_TRACER_AVAILABLE = False
+
 # Fast Tracers - lightweight, high-frequency monitoring
 from .crow_tracer import CrowTracer
 from .ant_tracer import AntTracer  
@@ -55,23 +73,86 @@ TRACER_CLASSES = {
     TracerType.MEDIEVAL_BEE: MedievalBeeTracer
 }
 
-def create_tracer_ecosystem(nutrient_budget: float = 100.0) -> TracerManager:
+def create_tracer_ecosystem(nutrient_budget: float = 100.0, enable_cuda: bool = True) -> TracerManager:
     """
-    Create a complete tracer ecosystem with all tracer types registered.
+    Create a complete tracer ecosystem with all registered tracer types.
     
     Args:
-        nutrient_budget: Total nutrient budget for the ecosystem
+        nutrient_budget: Initial nutrient budget for the ecosystem
+        enable_cuda: Whether to enable CUDA acceleration if available
         
     Returns:
-        TracerManager: Configured tracer manager with all tracers registered
+        TracerManager: Configured tracer ecosystem
     """
-    manager = TracerManager(nutrient_budget=nutrient_budget)
+    manager = TracerManager(nutrient_budget)
     
-    # Register all tracer classes
-    for tracer_type, tracer_class in TRACER_CLASSES.items():
-        manager.register_tracer_class(tracer_type, tracer_class)
+    # Register all standard tracer classes
+    manager.register_tracer_class(TracerType.CROW, CrowTracer)
+    manager.register_tracer_class(TracerType.ANT, AntTracer)
+    manager.register_tracer_class(TracerType.BEE, BeeTracer)
+    manager.register_tracer_class(TracerType.SPIDER, SpiderTracer)
+    manager.register_tracer_class(TracerType.BEETLE, BeetleTracer)
+    manager.register_tracer_class(TracerType.WHALE, WhaleTracer)
+    manager.register_tracer_class(TracerType.OWL, OwlTracer)
+    manager.register_tracer_class(TracerType.MEDIEVAL_BEE, MedievalBeeTracer)
+    
+    # Initialize CUDA acceleration if requested and available
+    if enable_cuda and CUDA_TRACER_AVAILABLE:
+        try:
+            cuda_engine = get_cuda_tracer_engine()
+            if cuda_engine.cuda_available:
+                logger.info("✅ CUDA tracer acceleration enabled")
+            else:
+                logger.info("⚠️  CUDA libraries available but no GPU detected")
+        except Exception as e:
+            logger.warning(f"Could not initialize CUDA tracer acceleration: {e}")
     
     return manager
+
+
+def create_cuda_tracer_ecosystem(
+    nutrient_budget: float = 100.0,
+    cuda_config: Optional[CUDATracerModelConfig] = None,
+    viz_config: Optional[TracerVisualizationConfig] = None,
+    enable_visualization: bool = True
+) -> Dict[str, Any]:
+    """
+    Create a complete CUDA-accelerated tracer ecosystem with visualization.
+    
+    Args:
+        nutrient_budget: Initial nutrient budget for the ecosystem
+        cuda_config: CUDA modeling configuration
+        viz_config: Visualization configuration
+        enable_visualization: Whether to enable real-time visualization
+        
+    Returns:
+        Dict containing manager, cuda_engine, and viz_engine
+    """
+    if not CUDA_TRACER_AVAILABLE:
+        raise ImportError("CUDA tracer components not available")
+    
+    # Create standard ecosystem
+    manager = create_tracer_ecosystem(nutrient_budget, enable_cuda=True)
+    
+    # Get CUDA engines
+    cuda_engine = get_cuda_tracer_engine(cuda_config)
+    
+    ecosystem = {
+        'manager': manager,
+        'cuda_engine': cuda_engine,
+        'viz_engine': None
+    }
+    
+    if enable_visualization:
+        try:
+            viz_engine = get_cuda_tracer_visualization_engine(viz_config)
+            viz_engine.connect_to_tracer_manager(manager)
+            ecosystem['viz_engine'] = viz_engine
+            logger.info("✅ CUDA tracer visualization enabled")
+        except Exception as e:
+            logger.warning(f"Could not initialize CUDA tracer visualization: {e}")
+    
+    return ecosystem
 
 def get_tracer_archetypes() -> dict:
     """
@@ -119,3 +200,18 @@ __all__ = [
     'create_tracer_ecosystem',
     'get_tracer_archetypes'
 ]
+
+# Add CUDA components to exports if available
+if CUDA_TRACER_AVAILABLE:
+    __all__.extend([
+        'CUDATracerModelingEngine',
+        'CUDATracerModelConfig', 
+        'get_cuda_tracer_engine',
+        'reset_cuda_tracer_engine',
+        'CUDATracerVisualizationEngine',
+        'TracerVisualizationConfig',
+        'get_cuda_tracer_visualization_engine',
+        'reset_cuda_tracer_visualization_engine',
+        'create_cuda_tracer_ecosystem',
+        'CUDA_TRACER_AVAILABLE'
+    ])

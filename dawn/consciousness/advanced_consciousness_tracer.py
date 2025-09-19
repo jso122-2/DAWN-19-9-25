@@ -141,15 +141,15 @@ class AdvancedConsciousnessTracer(BaseModule):
     """
     
     def __init__(self,
-                 consciousness_bus: ConsciousnessBus,
-                 advanced_integration: AdvancedConsciousnessIntegration,
+                 consciousness_bus: Optional[ConsciousnessBus] = None,
+                 advanced_integration: Optional[AdvancedConsciousnessIntegration] = None,
                  config: Optional[TracerConfiguration] = None):
         """
         Initialize Advanced Consciousness Tracer
         
         Args:
-            consciousness_bus: Central consciousness communication hub
-            advanced_integration: Advanced consciousness integration system
+            consciousness_bus: Central consciousness communication hub (optional, uses singleton if None)
+            advanced_integration: Advanced consciousness integration system (optional)
             config: Tracer configuration
         """
         super().__init__("advanced_consciousness_tracer")
@@ -159,8 +159,19 @@ class AdvancedConsciousnessTracer(BaseModule):
         self.tracer_id = str(uuid.uuid4())
         self.creation_time = datetime.now()
         
-        # Core systems
-        self.consciousness_bus = consciousness_bus
+        # Core systems - use DAWN singleton if not provided
+        if consciousness_bus is None:
+            try:
+                from dawn.core.singleton import get_dawn
+                dawn_system = get_dawn()
+                self.consciousness_bus = dawn_system.consciousness_bus
+                logger.info("🌅 Using DAWN singleton for consciousness bus")
+            except ImportError:
+                logger.warning("DAWN singleton not available, using provided consciousness_bus")
+                self.consciousness_bus = consciousness_bus
+        else:
+            self.consciousness_bus = consciousness_bus
+            
         self.advanced_integration = advanced_integration
         self.existing_tracer = None
         

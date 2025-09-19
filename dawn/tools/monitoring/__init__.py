@@ -1,19 +1,14 @@
 """
-DAWN Monitoring Tools
-====================
+Monitoring Tools
+===============
 
-Real-time monitoring and analysis tools for DAWN consciousness system.
-
-Available monitors:
-    - TickStateReader: Real-time tick orchestrator monitoring
-    - ConsciousnessMonitor: Consciousness level tracking
-    - SystemHealthMonitor: Overall system health metrics
-    - MemoryMonitor: Memory system analysis
+Tools for monitoring DAWN's consciousness, system health, and tool usage.
 """
 
-from .tick_state_reader import TickStateReader, TickSnapshot
+from .consciousness_monitor import ConsciousnessMonitor
+from .system_health import SystemHealthMonitor
 
 __all__ = [
-    'TickStateReader',
-    'TickSnapshot'
+    'ConsciousnessMonitor',
+    'SystemHealthMonitor'
 ]

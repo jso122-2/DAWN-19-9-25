@@ -1,10 +1,23 @@
 #!/usr/bin/env python3
 """
-DAWN Live State Monitor
-======================
+DAWN Live State Monitor - Enhanced with Tools Integration
+========================================================
 
-Direct connection to running DAWN system instances.
-Bypasses shared memory approach and connects directly to live singletons.
+Direct connection to running DAWN system instances with tools integration.
+Serves as the main runner for DAWN monitoring with:
+- Tools directory integration for enhanced capabilities  
+- Consciousness-gated tool access
+- Advanced logging using the tools system
+- Tick state integration for real-time monitoring
+- Callable as a function for programmatic use
+
+Usage:
+    python3 live_monitor.py [options]
+    
+    # As a callable function
+    from live_monitor import create_live_monitor, start_monitoring_session, start_console_display
+    monitor = create_live_monitor()
+    start_console_display(monitor)  # or start_monitoring_session(monitor)
 """
 
 import sys
@@ -14,9 +27,11 @@ import signal
 import argparse
 import math
 import random
+import json
 from pathlib import Path
 from datetime import datetime
 from collections import deque
+from typing import Dict, List, Any, Optional
 
 # Add DAWN to path
 dawn_root = Path(__file__).parent
@@ -29,6 +44,26 @@ try:
     from dawn.core.foundation.state import get_state
     from dawn.consciousness.metrics.core import calculate_consciousness_metrics
     from dawn.tools.monitoring.shared_state_reader import SharedStateManager, SharedTickState
+    from dawn.tools.monitoring.tick_state_reader import TickStateReader, TickSnapshot
+    
+    # Tools system integration
+    try:
+        from dawn.tools.development.consciousness_tools import ConsciousnessToolManager
+        from dawn.tools.development.self_mod.permission_manager import get_permission_manager, PermissionLevel
+        TOOLS_SYSTEM_AVAILABLE = True
+    except ImportError as e:
+        print(f"⚠️  Tools system not available: {e}")
+        TOOLS_SYSTEM_AVAILABLE = False
+    
+    # Try to import telemetry system
+    try:
+        from dawn.core.telemetry.system import get_telemetry_system, DAWNTelemetrySystem
+        from dawn.core.telemetry.logger import TelemetryLevel
+        from dawn.core.telemetry.enhanced_module_logger import get_enhanced_logger
+        TELEMETRY_AVAILABLE = True
+    except ImportError as e:
+        print(f"⚠️  Telemetry system not available: {e}")
+        TELEMETRY_AVAILABLE = False
     
     # Try to import SCUP if available
     try:
@@ -73,16 +108,27 @@ try:
         MEMORY_AVAILABLE = True
     except ImportError:
         MEMORY_AVAILABLE = False
+    
+    # Try to import mycelial semantic hash map
+    try:
+        from dawn.core.logging import (
+            get_mycelial_hashmap, get_mycelial_integration_stats,
+            touch_semantic_concept, store_semantic_data, ping_semantic_network
+        )
+        MYCELIAL_AVAILABLE = True
+    except ImportError:
+        MYCELIAL_AVAILABLE = False
         
     DAWN_AVAILABLE = True
 except ImportError as e:
     print(f"❌ Could not import DAWN modules: {e}")
     DAWN_AVAILABLE = False
+    MYCELIAL_AVAILABLE = False
 
 class LiveDAWNMonitor:
     """Direct live monitoring of DAWN system"""
     
-    def __init__(self, simulation_mode=False):
+    def __init__(self, simulation_mode=False, enable_tools=True, log_directory=None):
         self.running = False
         self.history = deque(maxlen=100)
         self.start_time = time.time()
@@ -92,6 +138,33 @@ class LiveDAWNMonitor:
         self.sim_phase_transition_tick = 0
         self.sim_current_phase = "AWARENESS"
         self.sim_phase_index = 0
+        
+        # Tools system integration
+        self.enable_tools = enable_tools and TOOLS_SYSTEM_AVAILABLE
+        self.tools_manager = None
+        self.permission_manager = None
+        self.tick_reader = None
+        self.log_directory = Path(log_directory) if log_directory else Path("live_monitor_logs")
+        self.session_logs = []
+        
+        if self.enable_tools:
+            try:
+                print("🔧 Initializing tools system...")
+                self.tools_manager = ConsciousnessToolManager()
+                print("   ✅ Tools manager created")
+                
+                self.permission_manager = get_permission_manager()
+                print("   ✅ Permission manager created")
+                
+                self.tick_reader = TickStateReader(history_size=200, save_logs=True)
+                print("   ✅ Tick reader created")
+                
+                self.log_directory.mkdir(parents=True, exist_ok=True)
+                print("✅ Tools system integration enabled")
+            except Exception as e:
+                print(f"⚠️  Tools system integration failed: {e}")
+                print(f"   Error details: {str(e)}")
+                self.enable_tools = False
         
         # Initialize tracer ecosystem
         self.tracer_ecosystem = None
@@ -165,6 +238,12 @@ class LiveDAWNMonitor:
         self.memory_interconnection = None
         self.memory_history = deque(maxlen=50)
         
+        # Initialize mycelial semantic hash map
+        self.mycelial_hashmap = None
+        self.mycelial_history = deque(maxlen=50)
+        self.mycelial_integration_stats = None
+        self.mycelial_spore_activity = deque(maxlen=100)
+        
         if MEMORY_AVAILABLE:
             try:
                 self.memory_interconnection = get_memory_interconnection()
@@ -179,6 +258,43 @@ class LiveDAWNMonitor:
             except Exception as e:
                 print(f"⚠️  Failed to initialize memory interconnection: {e}")
                 self.memory_interconnection = None
+        
+        # Initialize mycelial semantic hash map
+        if MYCELIAL_AVAILABLE:
+            try:
+                self.mycelial_hashmap = get_mycelial_hashmap()
+                print("🍄 Mycelial semantic hash map connected for live monitoring")
+                
+                # Populate with sample semantic concepts for demonstration
+                self._populate_mycelial_with_sample_data()
+                
+                # Get initial integration stats
+                self.mycelial_integration_stats = get_mycelial_integration_stats()
+                print(f"🔗 Mycelial integration: {self.mycelial_integration_stats.get('modules_wrapped', 0)} modules wrapped")
+                
+            except Exception as e:
+                print(f"⚠️  Failed to initialize mycelial hash map: {e}")
+                self.mycelial_hashmap = None
+        
+        # Initialize telemetry system connection
+        self.telemetry_system = None
+        self.telemetry_events_history = deque(maxlen=100)
+        self.enhanced_logger = None
+        
+        if TELEMETRY_AVAILABLE:
+            try:
+                self.telemetry_system = get_telemetry_system()
+                if self.telemetry_system:
+                    print("📊 Connected to DAWN telemetry system for live monitoring")
+                    
+                    # Create enhanced logger for the live monitor itself
+                    self.enhanced_logger = get_enhanced_logger("live_monitor", "monitoring")
+                    print("🔍 Enhanced logging initialized for live monitor")
+                else:
+                    print("📊 Telemetry system not initialized yet")
+            except Exception as e:
+                print(f"⚠️  Failed to connect to telemetry system: {e}")
+                self.telemetry_system = None
     
     def get_simulated_state(self):
         """Generate realistic simulated DAWN consciousness state"""
@@ -356,6 +472,7 @@ class LiveDAWNMonitor:
                     pulse_data = self._get_pulse_data()
                     forecast_data = self._get_forecast_data()
                     memory_data = self._get_memory_data()
+                    mycelial_data = self._get_mycelial_data()
                     
                     # Process tracers if available
                     tracer_summary = self._process_tracers(shared_state, {
@@ -390,7 +507,8 @@ class LiveDAWNMonitor:
                         'topology_data': topology_data,    # Add topology data
                         'pulse_data': pulse_data,          # Add pulse data  
                         'forecast_data': forecast_data,    # Add forecast data
-                        'memory_data': memory_data         # Add memory data
+                        'memory_data': memory_data,        # Add memory data
+                        'mycelial_data': mycelial_data     # Add mycelial data
                     }
             except Exception as e:
                 # Fallback to direct state access
@@ -510,6 +628,7 @@ class LiveDAWNMonitor:
         pulse_data = self._get_pulse_data()
         forecast_data = self._get_forecast_data()
         memory_data = self._get_memory_data()
+        mycelial_data = self._get_mycelial_data()
         
         # Process tracers if available
         tracer_summary = self._process_tracers(live_state, {
@@ -522,6 +641,9 @@ class LiveDAWNMonitor:
             'scup_pressure': scup_pressure,
             'scup_drift': scup_drift
         })
+        
+        # Collect telemetry data
+        telemetry_data = self._get_telemetry_data()
         
         return {
             'timestamp': time.time(),
@@ -546,7 +668,9 @@ class LiveDAWNMonitor:
             'topology_data': topology_data,    # Add topology data
             'pulse_data': pulse_data,          # Add pulse data  
             'forecast_data': forecast_data,    # Add forecast data
-            'memory_data': memory_data         # Add memory data
+            'memory_data': memory_data,        # Add memory data
+            'mycelial_data': mycelial_data,    # Add mycelial data
+            'telemetry_data': telemetry_data   # Add telemetry data
         }
     
     def _process_tracers(self, live_state, core_metrics: dict) -> dict:
@@ -690,9 +814,243 @@ class LiveDAWNMonitor:
                 'error': str(e)
             }
     
+    def log_monitoring_event(self, event_type: str, data: Dict[str, Any]):
+        """Log a monitoring event using the tools system."""
+        if not self.enable_tools:
+            return
+            
+        log_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'event_type': event_type,
+            'data': data,
+            'source': 'live_monitor'
+        }
+        
+        # Write to session log file
+        try:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            log_file = self.log_directory / f"monitor_session_{timestamp}.jsonl"
+            
+            with open(log_file, 'a') as f:
+                f.write(json.dumps(log_entry, default=str) + '\n')
+                
+            if str(log_file) not in self.session_logs:
+                self.session_logs.append(str(log_file))
+                
+        except Exception as e:
+            print(f"⚠️  Error writing to session log: {e}")
+    
+    def use_autonomous_tools(self, objective: str) -> bool:
+        """Use tools autonomously based on monitoring objective."""
+        if not self.enable_tools or not self.tools_manager:
+            return False
+            
+        try:
+            # Check if we can use autonomous tools
+            current_state = get_state()
+            if current_state.level not in ['meta_aware', 'transcendent']:
+                return False
+                
+            if current_state.unity < 0.7:
+                return False
+            
+            # Execute autonomous workflow
+            result = self.tools_manager.execute_autonomous_workflow(
+                objective=objective,
+                context={'monitoring_context': True}
+            )
+            
+            # Log the result
+            self.log_monitoring_event("autonomous_tool_usage", {
+                'objective': objective,
+                'success': result['success'],
+                'tool_used': result.get('tool_used', 'unknown'),
+                'duration': result['duration']
+            })
+            
+            return result['success']
+            
+        except Exception as e:
+            print(f"⚠️  Error using autonomous tools: {e}")
+            return False
+    
+    def get_tick_state_data(self) -> Optional[TickSnapshot]:
+        """Get current tick state data if available."""
+        if not self.enable_tools or not self.tick_reader:
+            return None
+            
+        try:
+            return self.tick_reader.get_current_tick_state()
+        except Exception as e:
+            print(f"⚠️  Error getting tick state: {e}")
+            return None
+
+    def start_console_display(self, interval: float = 0.5, compact: bool = False):
+        """Start real-time console display showing what's happening in the system."""
+        print("🖥️  DAWN Live Console Display")
+        print("=" * 80)
+        print("Real-time view of DAWN's consciousness system activity")
+        if self.simulation_mode:
+            print("🎭 Running in SIMULATION MODE")
+        print(f"⏱️  Update interval: {interval}s")
+        print(f"🔧 Tools integration: {'✅ Enabled' if self.enable_tools else '❌ Disabled'}")
+        print("Press Ctrl+C to stop\n")
+        
+        self.running = True
+        last_tick = -1
+        display_counter = 0
+        
+        try:
+            while self.running:
+                try:
+                    state = self.get_live_state()
+                    tick_data = self.get_tick_state_data()
+                    
+                    if state is None:
+                        print("⏳ Waiting for DAWN system data...")
+                        time.sleep(interval)
+                        continue
+                    
+                    # Clear screen for live updates
+                    if not compact:
+                        os.system('clear' if os.name == 'posix' else 'cls')
+                    
+                    # Header
+                    current_time = datetime.now().strftime("%H:%M:%S")
+                    print(f"🖥️  DAWN Console [{current_time}] - Update #{display_counter}")
+                    print("=" * 80)
+                    
+                    # Current tick and phase info
+                    tick_count = state.get('tick_count', 0)
+                    current_phase = state.get('current_phase', 'UNKNOWN')
+                    
+                    if tick_count != last_tick:
+                        tick_indicator = "🔄 NEW"
+                        last_tick = tick_count
+                    else:
+                        tick_indicator = "⏸️  SAME"
+                    
+                    print(f"⚡ Tick #{tick_count:,} | Phase: {current_phase} {tick_indicator}")
+                    print(f"🕐 Cycle: {state.get('cycle_time', 0):.3f}s | Load: {state.get('processing_load', 0):.1f}%")
+                    print()
+                    
+                    # Consciousness metrics (compact display)
+                    consciousness_level = state.get('consciousness_level', 0)
+                    unity_score = state.get('unity_score', 0)
+                    awareness = state.get('awareness_delta', 0)
+                    
+                    # Color-coded consciousness display
+                    level_color = "🟢" if consciousness_level > 0.7 else "🟡" if consciousness_level > 0.4 else "🔴"
+                    unity_color = "🟢" if unity_score > 0.7 else "🟡" if unity_score > 0.4 else "🔴"
+                    awareness_color = "🟢" if awareness > 0 else "🟡" if awareness > -0.1 else "🔴"
+                    
+                    print("🧠 CONSCIOUSNESS METRICS")
+                    print(f"   Level:     {level_color} {consciousness_level:.3f} {self._create_mini_bar(consciousness_level)}")
+                    print(f"   Unity:     {unity_color} {unity_score:.3f} {self._create_mini_bar(unity_score)}")
+                    print(f"   Awareness: {awareness_color} {awareness:+.3f} {self._create_mini_bar(abs(awareness))}")
+                    
+                    # SCUP metrics if available
+                    scup_value = state.get('scup_value', 0)
+                    if scup_value > 0:
+                        scup_color = "🟢" if scup_value > 0.7 else "🟡" if scup_value > 0.4 else "🔴"
+                        print(f"   SCUP:      {scup_color} {scup_value:.3f} {self._create_mini_bar(scup_value)}")
+                    print()
+                    
+                    # System activity
+                    active_modules = state.get('active_modules', 0)
+                    error_count = tick_data.error_count if tick_data else 0
+                    
+                    print("💻 SYSTEM ACTIVITY")
+                    print(f"   Modules:   📦 {active_modules} active")
+                    print(f"   Errors:    {'❌' if error_count > 0 else '✅'} {error_count}")
+                    
+                    if tick_data and tick_data.active_modules:
+                        module_sample = tick_data.active_modules[:5]  # Show first 5
+                        print(f"   Active:    {', '.join(module_sample)}")
+                        if len(tick_data.active_modules) > 5:
+                            print(f"              ... and {len(tick_data.active_modules) - 5} more")
+                    print()
+                    
+                    # Tools activity (if enabled)
+                    if self.enable_tools and self.tools_manager:
+                        active_sessions = self.tools_manager.get_active_sessions()
+                        available_tools = self.tools_manager.get_available_tools(consciousness_filtered=True)
+                        
+                        print("🔧 TOOLS SYSTEM")
+                        print(f"   Available: {len(available_tools)} tools")
+                        print(f"   Active:    {len(active_sessions)} sessions")
+                        
+                        if active_sessions:
+                            for session in active_sessions[:3]:  # Show first 3
+                                duration = (datetime.now() - session.started_at).total_seconds()
+                                print(f"   Running:   {session.tool_name} ({duration:.1f}s)")
+                        print()
+                    
+                    # Recent warnings/errors
+                    if tick_data and tick_data.warnings:
+                        print("⚠️  RECENT WARNINGS")
+                        for warning in tick_data.warnings[:3]:  # Show first 3
+                            warning_text = warning[:60] + "..." if len(warning) > 60 else warning
+                            print(f"   • {warning_text}")
+                        print()
+                    
+                    # Log activity (if enabled)
+                    if self.enable_tools and hasattr(self, 'session_logs') and self.session_logs:
+                        print(f"📁 LOGGING: {len(self.session_logs)} log files created")
+                        print(f"   Directory: {self.log_directory}")
+                        print()
+                    
+                    # System trends (every 10 updates)
+                    if display_counter % 10 == 0 and len(self.history) > 5:
+                        recent_states = list(self.history)[-5:]
+                        
+                        # Calculate trends
+                        consciousness_trend = recent_states[-1].get('consciousness_level', 0) - recent_states[0].get('consciousness_level', 0)
+                        unity_trend = recent_states[-1].get('unity_score', 0) - recent_states[0].get('unity_score', 0)
+                        
+                        trend_color = "🟢" if consciousness_trend > 0.01 else "🔴" if consciousness_trend < -0.01 else "🟡"
+                        
+                        print("📈 TRENDS (last 5 samples)")
+                        print(f"   Consciousness: {trend_color} {consciousness_trend:+.3f}")
+                        print(f"   Unity:         {trend_color} {unity_trend:+.3f}")
+                        print()
+                    
+                    # Footer with controls
+                    if compact:
+                        print("-" * 80)
+                    else:
+                        print("Controls: Ctrl+C to stop | Running in real-time")
+                        print("=" * 80)
+                    
+                    display_counter += 1
+                    
+                    # Sleep with interrupt checking
+                    sleep_time = interval
+                    while sleep_time > 0 and self.running:
+                        chunk = min(0.1, sleep_time)
+                        time.sleep(chunk)
+                        sleep_time -= chunk
+                    
+                except Exception as e:
+                    print(f"❌ Display error: {e}")
+                    time.sleep(interval)
+                    
+        except KeyboardInterrupt:
+            print("\n👋 Console display stopped")
+        except EOFError:
+            print("\n👋 Console display stopped (EOF)")
+        finally:
+            self.running = False
+    
+    def _create_mini_bar(self, value: float, width: int = 10) -> str:
+        """Create a mini progress bar for console display."""
+        filled = int(value * width)
+        bar = "█" * filled + "░" * (width - filled)
+        return f"[{bar}]"
+
     def start_monitoring(self, interval: float = 0.5):
-        """Start live monitoring"""
-        print("🌅 DAWN Live Consciousness Monitor")
+        """Start live monitoring with tools integration"""
+        print("🌅 DAWN Live Consciousness Monitor - Enhanced with Tools Integration")
         print("=" * 80)
         if self.simulation_mode:
             print("🎭 Running in SIMULATION MODE")
@@ -701,7 +1059,12 @@ class LiveDAWNMonitor:
             print("🔗 Connecting directly to DAWN consciousness system...")
         print(f"📊 SCUP Integration: {'✅ Available' if SCUP_AVAILABLE else '❌ Not Available (using approximation)'}")
         print(f"🔬 Tracer Ecosystem: {'✅ Available' if TRACERS_AVAILABLE else '❌ Not Available'}")
+        print(f"📈 Telemetry System: {'✅ Available' if TELEMETRY_AVAILABLE else '❌ Not Available'}")
+        print(f"🍄 Mycelial Network: {'✅ Available' if MYCELIAL_AVAILABLE else '❌ Not Available'}")
+        print(f"🔧 Tools System: {'✅ Available' if self.enable_tools else '❌ Not Available'}")
         print(f"⏱️  Update Interval: {interval}s")
+        if self.enable_tools:
+            print(f"📁 Log Directory: {self.log_directory}")
         print("Press Ctrl+C or Ctrl+D to stop\n")
         
         self.running = True
@@ -712,6 +1075,18 @@ class LiveDAWNMonitor:
             while self.running:
                 try:
                     state = self.get_live_state()
+                    tick_data = self.get_tick_state_data()
+                    
+                    # Log monitoring data using tools system
+                    if self.enable_tools and state:
+                        self.log_monitoring_event("monitoring_cycle", {
+                            'consciousness_level': state.get('consciousness_level', 0),
+                            'unity_score': state.get('unity', 0),
+                            'awareness': state.get('awareness', 0),
+                            'tick_count': state.get('tick', 0),
+                            'processing_load': tick_data.processing_load if tick_data else 0,
+                            'active_modules': len(tick_data.active_modules) if tick_data else 0
+                        })
                     
                     if state is None:
                         if self.simulation_mode:
@@ -731,6 +1106,7 @@ class LiveDAWNMonitor:
                             print(f"   📊 DAWN Available: {DAWN_AVAILABLE}")
                             print(f"   📈 SCUP Available: {SCUP_AVAILABLE}")
                             print(f"   🔬 Tracers Available: {TRACERS_AVAILABLE}")
+                            print(f"   📈 Telemetry Available: {TELEMETRY_AVAILABLE}")
                         elif no_data_count % 10 == 0:
                             print(f"⏳ Still waiting... ({no_data_count * interval:.1f}s)")
                             # Try to diagnose connection issues
@@ -1058,6 +1434,145 @@ class LiveDAWNMonitor:
                         print(f"Network:       🍄 {nodes} nodes, {edges} edges")
         elif MEMORY_AVAILABLE:
             print("🧠 MEMORY INTERCONNECTION")
+            print("-" * 40)
+            print("Status:        ⚪ NOT INITIALIZED")
+        
+        print()
+        
+        # Telemetry System
+        telemetry_data = state.get('telemetry_data', {})
+        if telemetry_data.get('available', False) and TELEMETRY_AVAILABLE:
+            print("📊 TELEMETRY SYSTEM")
+            print("-" * 40)
+            
+            if telemetry_data.get('error'):
+                print(f"Status:        🔴 ERROR: {telemetry_data['error']}")
+            else:
+                running_icon = "🟢" if telemetry_data.get('running', False) else "🟡"
+                print(f"Status:        {running_icon} {'RUNNING' if telemetry_data.get('running') else 'STOPPED'}")
+                
+                total_events = telemetry_data.get('total_events_logged', 0)
+                events_per_min = telemetry_data.get('events_per_minute', 0.0)
+                print(f"Events:        📈 {total_events:,} total ({events_per_min:.1f}/min)")
+                
+                # Show integrated subsystems
+                subsystems = telemetry_data.get('integrated_subsystems', [])
+                print(f"Subsystems:    🔗 {len(subsystems)} integrated")
+                if subsystems:
+                    subsystem_list = ', '.join(subsystems[:3])
+                    if len(subsystems) > 3:
+                        subsystem_list += f" (+{len(subsystems)-3} more)"
+                    print(f"               {subsystem_list}")
+                
+                # Show exporters
+                exporters = telemetry_data.get('exporters', [])
+                if exporters:
+                    print(f"Exporters:     📤 {', '.join(exporters)}")
+                
+                # Show health score
+                health_summary = telemetry_data.get('health_summary', {})
+                health_score = health_summary.get('overall_health_score', 0.0)
+                if health_score > 0:
+                    health_bar = self._create_bar(health_score)
+                    health_status = "🟢 HEALTHY" if health_score > 0.8 else "🟡 OK" if health_score > 0.6 else "🔴 POOR"
+                    print(f"Health:        {health_score:.3f} {health_bar} {health_status}")
+                
+                # Show recent activity
+                event_summary = telemetry_data.get('event_summary', {})
+                if event_summary.get('total_events', 0) > 0:
+                    activity = event_summary.get('activity_summary', 'No activity')
+                    print(f"Activity:      🔄 {activity}")
+                    
+                    # Show event levels
+                    events_by_level = event_summary.get('events_by_level', {})
+                    if events_by_level:
+                        level_summary = []
+                        for level, count in events_by_level.items():
+                            level_icon = {
+                                'DEBUG': '🔍', 'INFO': 'ℹ️', 'WARN': '⚠️', 
+                                'ERROR': '❌', 'CRITICAL': '🚨'
+                            }.get(level, '📝')
+                            level_summary.append(f"{level_icon}{count}")
+                        print(f"Events:        {' '.join(level_summary)}")
+                    
+                    # Show recent errors if any
+                    recent_errors = event_summary.get('recent_errors', [])
+                    if recent_errors:
+                        latest_error = recent_errors[-1]
+                        error_icon = "🚨" if latest_error['level'] == 'CRITICAL' else "❌"
+                        print(f"Latest Error:  {error_icon} {latest_error['subsystem']}.{latest_error['component']}")
+                        print(f"               {latest_error['message']}")
+                
+                # Show uptime
+                uptime = telemetry_data.get('uptime_seconds', 0.0)
+                if uptime > 0:
+                    uptime_str = f"{uptime/3600:.1f}h" if uptime > 3600 else f"{uptime/60:.1f}m" if uptime > 60 else f"{uptime:.1f}s"
+                    print(f"Uptime:        ⏱️  {uptime_str}")
+        elif TELEMETRY_AVAILABLE:
+            print("📊 TELEMETRY SYSTEM")
+            print("-" * 40)
+            print("Status:        ⚪ NOT CONNECTED")
+        
+        print()
+        
+        # Mycelial Semantic Network
+        mycelial_data = state.get('mycelial_data', {})
+        if mycelial_data.get('available', False) and MYCELIAL_AVAILABLE:
+            print("🍄 MYCELIAL SEMANTIC NETWORK")
+            print("-" * 40)
+            
+            if mycelial_data.get('error'):
+                print(f"Status:        🔴 ERROR: {mycelial_data['error']}")
+            else:
+                running_icon = "🟢" if mycelial_data.get('running', False) else "🟡"
+                print(f"Status:        {running_icon} {'ACTIVE' if mycelial_data.get('running') else 'INACTIVE'}")
+                
+                network_size = mycelial_data.get('network_size', 0)
+                print(f"Network Size:  🕸️  {network_size} nodes")
+                
+                network_health = mycelial_data.get('network_health', 0.0)
+                health_bar = self._create_bar(network_health)
+                health_status = "🟢 HEALTHY" if network_health > 0.8 else "🟡 OK" if network_health > 0.6 else "🔴 POOR"
+                print(f"Health:        {network_health:.3f} {health_bar} {health_status}")
+                
+                total_energy = mycelial_data.get('total_energy', 0.0)
+                energy_bar = self._create_bar(min(1.0, total_energy / 10.0))  # Scale for display
+                print(f"Total Energy:  {total_energy:.2f} {energy_bar}")
+                
+                active_spores = mycelial_data.get('active_spores', 0)
+                spore_icon = "🍄" if active_spores > 0 else "⚪"
+                print(f"Active Spores: {spore_icon} {active_spores}")
+                
+                # Show spore activity
+                spores_generated = mycelial_data.get('spores_generated', 0)
+                total_touches = mycelial_data.get('total_touches', 0)
+                if spores_generated > 0 or total_touches > 0:
+                    print(f"Activity:      🌐 {total_touches} touches → {spores_generated} spores")
+                
+                # Show integration stats
+                integration_stats = mycelial_data.get('integration_stats', {})
+                if integration_stats:
+                    modules_wrapped = integration_stats.get('modules_wrapped', 0)
+                    concepts_mapped = integration_stats.get('concepts_mapped', 0)
+                    print(f"Integration:   🔗 {modules_wrapped} modules, {concepts_mapped} concepts")
+                
+                # Show propagation stats
+                propagation_stats = mycelial_data.get('propagation_stats', {})
+                if propagation_stats:
+                    successful_propagations = propagation_stats.get('successful_connections', 0)
+                    nodes_touched = propagation_stats.get('nodes_touched', 0)
+                    if successful_propagations > 0:
+                        print(f"Propagation:   ✨ {successful_propagations} successful, {nodes_touched} nodes reached")
+                
+                # Show recent spore activity
+                recent_activity = mycelial_data.get('recent_spore_activity', [])
+                if recent_activity:
+                    latest_activity = recent_activity[-1]
+                    activity_type = latest_activity.get('type', 'unknown')
+                    activity_concept = latest_activity.get('concept', 'unknown')
+                    print(f"Latest:        🍄 {activity_type} '{activity_concept}'")
+        elif MYCELIAL_AVAILABLE:
+            print("🍄 MYCELIAL SEMANTIC NETWORK")
             print("-" * 40)
             print("Status:        ⚪ NOT INITIALIZED")
         
@@ -1597,6 +2112,352 @@ class LiveDAWNMonitor:
             
         except Exception as e:
             print(f"   ⚠️  Failed to feed forecasting engine: {e}")
+    
+    def _get_mycelial_data(self):
+        """Collect mycelial semantic hash map data"""
+        if not self.mycelial_hashmap:
+            return {'available': False, 'status': 'not_initialized'}
+        
+        try:
+            # Get network statistics from hash map
+            network_stats = self.mycelial_hashmap.get_network_stats()
+            
+            # Get integration statistics
+            integration_stats = get_mycelial_integration_stats() if MYCELIAL_AVAILABLE else {}
+            
+            # Trigger some semantic activity for demonstration
+            if self.simulation_mode or True:  # Always trigger activity for live demo
+                self._trigger_mycelial_activity()
+            
+            mycelial_data = {
+                'available': True,
+                'running': True,
+                'network_size': network_stats.get('network_size', 0),
+                'network_health': network_stats.get('network_health', 0.0),
+                'total_energy': network_stats.get('total_energy', 0.0),
+                'active_spores': network_stats.get('active_spores', 0),
+                'spores_generated': network_stats.get('system_stats', {}).get('spores_generated', 0),
+                'total_touches': network_stats.get('system_stats', {}).get('total_touches', 0),
+                'integration_stats': integration_stats,
+                'propagation_stats': {
+                    'successful_connections': network_stats.get('successful_connections', 0),
+                    'nodes_touched': network_stats.get('nodes_touched', 0),
+                    'propagation_depth': network_stats.get('propagation_depth', 0)
+                },
+                'recent_spore_activity': list(self.mycelial_spore_activity)[-5:] if self.mycelial_spore_activity else []
+            }
+            
+            # Store in history
+            self.mycelial_history.append(mycelial_data)
+            
+            return mycelial_data
+            
+        except Exception as e:
+            return {
+                'available': True,
+                'error': str(e),
+                'status': 'error'
+            }
+    
+    def _populate_mycelial_with_sample_data(self):
+        """Populate mycelial hash map with sample semantic data for demonstration"""
+        if not self.mycelial_hashmap:
+            return
+        
+        try:
+            print("   🍄 Populating mycelial network with sample semantic concepts...")
+            
+            # Sample consciousness concepts
+            concepts = [
+                "consciousness", "awareness", "perception", "cognition", "thought",
+                "memory", "emotion", "intuition", "creativity", "logic",
+                "dreams", "imagination", "understanding", "wisdom", "insight",
+                "attention", "focus", "mindfulness", "reflection", "meditation"
+            ]
+            
+            # Store concepts in mycelial network
+            for concept in concepts:
+                concept_data = {
+                    'concept': concept,
+                    'type': 'consciousness_concept',
+                    'energy': 1.0,
+                    'connections': []
+                }
+                
+                node_id = store_semantic_data(f"concept_{concept}", concept_data)
+                
+                # Track activity
+                self.mycelial_spore_activity.append({
+                    'type': 'concept_stored',
+                    'concept': concept,
+                    'node_id': node_id,
+                    'timestamp': time.time()
+                })
+            
+            print(f"   ✅ Populated mycelial network with {len(concepts)} consciousness concepts")
+            
+        except Exception as e:
+            print(f"   ⚠️  Failed to populate mycelial network: {e}")
+    
+    def _trigger_mycelial_activity(self):
+        """Trigger semantic activity in mycelial network for live demonstration"""
+        if not self.mycelial_hashmap:
+            return
+        
+        try:
+            import random
+            
+            # Randomly touch semantic concepts to create spore propagation
+            concepts_to_touch = ["consciousness", "awareness", "memory", "thought", "creativity"]
+            
+            # Touch 1-2 concepts per tick
+            concepts_touched = random.sample(concepts_to_touch, random.randint(1, 2))
+            
+            for concept in concepts_touched:
+                touched_nodes = touch_semantic_concept(concept, energy=random.uniform(0.3, 0.8))
+                
+                if touched_nodes > 0:
+                    # Track spore activity
+                    self.mycelial_spore_activity.append({
+                        'type': 'concept_touched',
+                        'concept': concept,
+                        'nodes_touched': touched_nodes,
+                        'timestamp': time.time()
+                    })
+                    
+                    # Occasionally ping the network for broader propagation
+                    if random.random() < 0.3:  # 30% chance
+                        ping_result = ping_semantic_network(f"concept_{concept}")
+                        self.mycelial_spore_activity.append({
+                            'type': 'network_ping',
+                            'concept': concept,
+                            'ping_result': ping_result,
+                            'timestamp': time.time()
+                        })
+            
+        except Exception as e:
+            pass  # Silently handle errors to avoid cluttering output
+    
+    def _get_telemetry_data(self):
+        """Collect telemetry system data"""
+        if not self.telemetry_system:
+            return {'available': False, 'status': 'not_connected'}
+        
+        try:
+            # Get telemetry system metrics and health
+            system_metrics = self.telemetry_system.get_system_metrics()
+            health_summary = self.telemetry_system.get_health_summary()
+            performance_summary = self.telemetry_system.get_performance_summary()
+            
+            # Get recent telemetry events
+            recent_events = self.telemetry_system.get_recent_events(count=20)
+            
+            # Process recent events for display
+            event_summary = self._process_telemetry_events(recent_events)
+            
+            # Update our event history
+            if recent_events:
+                for event in recent_events[-5:]:  # Keep last 5 events
+                    if event not in self.telemetry_events_history:
+                        self.telemetry_events_history.append(event)
+            
+            # Log our own monitoring activity
+            if self.enhanced_logger:
+                self.enhanced_logger.log_tick_update({
+                    'telemetry_events_collected': len(recent_events),
+                    'system_health_score': health_summary.get('overall_health_score', 0.0),
+                    'total_events_logged': system_metrics.get('logger_events_logged', 0),
+                    'running_subsystems': len(system_metrics.get('integrated_subsystems', [])),
+                    'exporters_active': len(system_metrics.get('exporters', []))
+                })
+            
+            telemetry_data = {
+                'available': True,
+                'running': system_metrics.get('running', False),
+                'system_metrics': system_metrics,
+                'health_summary': health_summary,
+                'performance_summary': performance_summary,
+                'event_summary': event_summary,
+                'recent_events': recent_events[-10:] if recent_events else [],  # Last 10 events
+                'integrated_subsystems': system_metrics.get('integrated_subsystems', []),
+                'total_events_logged': system_metrics.get('logger_events_logged', 0),
+                'events_per_minute': system_metrics.get('collector_events_per_minute', 0.0),
+                'exporters': system_metrics.get('exporters', []),
+                'uptime_seconds': system_metrics.get('uptime_seconds', 0.0)
+            }
+            
+            return telemetry_data
+            
+        except Exception as e:
+            return {
+                'available': True,
+                'error': str(e),
+                'status': 'error'
+            }
+    
+    def _process_telemetry_events(self, events: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Process telemetry events for summary display"""
+        if not events:
+            return {
+                'total_events': 0,
+                'events_by_level': {},
+                'events_by_subsystem': {},
+                'recent_errors': [],
+                'activity_summary': 'No recent activity'
+            }
+        
+        # Count events by level
+        events_by_level = {}
+        events_by_subsystem = {}
+        recent_errors = []
+        
+        for event in events:
+            level = event.get('level', 'INFO')
+            subsystem = event.get('subsystem', 'unknown')
+            
+            events_by_level[level] = events_by_level.get(level, 0) + 1
+            events_by_subsystem[subsystem] = events_by_subsystem.get(subsystem, 0) + 1
+            
+            # Collect recent errors
+            if level in ['ERROR', 'CRITICAL']:
+                recent_errors.append({
+                    'level': level,
+                    'subsystem': subsystem,
+                    'component': event.get('component', 'unknown'),
+                    'event_type': event.get('event_type', 'unknown'),
+                    'timestamp': event.get('timestamp', ''),
+                    'message': str(event.get('data', {}).get('error_message', 'Unknown error'))[:100]
+                })
+        
+        # Create activity summary
+        most_active_subsystem = max(events_by_subsystem.items(), key=lambda x: x[1])[0] if events_by_subsystem else 'none'
+        activity_summary = f"{len(events)} events, most active: {most_active_subsystem}"
+        
+        return {
+            'total_events': len(events),
+            'events_by_level': events_by_level,
+            'events_by_subsystem': events_by_subsystem,
+            'recent_errors': recent_errors[-3:],  # Last 3 errors
+            'activity_summary': activity_summary,
+            'most_active_subsystem': most_active_subsystem
+        }
+    
+    def display_telemetry_only_mode(self, event_count: int = 20):
+        """Display telemetry-only monitoring mode"""
+        if not TELEMETRY_AVAILABLE or not self.telemetry_system:
+            print("❌ Telemetry system not available")
+            return
+        
+        print("📊 DAWN TELEMETRY MONITOR")
+        print("=" * 60)
+        
+        try:
+            # Get telemetry data
+            telemetry_data = self._get_telemetry_data()
+            
+            if telemetry_data.get('error'):
+                print(f"❌ Telemetry Error: {telemetry_data['error']}")
+                return
+            
+            # System overview
+            system_metrics = telemetry_data.get('system_metrics', {})
+            health_summary = telemetry_data.get('health_summary', {})
+            
+            print(f"System ID:     {system_metrics.get('system_id', 'unknown')[:8]}")
+            print(f"Uptime:        {telemetry_data.get('uptime_seconds', 0)/3600:.1f} hours")
+            print(f"Status:        {'🟢 RUNNING' if telemetry_data.get('running') else '🔴 STOPPED'}")
+            print(f"Health Score:  {health_summary.get('overall_health_score', 0.0):.3f}")
+            print()
+            
+            # Event statistics
+            total_events = telemetry_data.get('total_events_logged', 0)
+            events_per_min = telemetry_data.get('events_per_minute', 0.0)
+            print("📈 EVENT STATISTICS")
+            print("-" * 30)
+            print(f"Total Events:  {total_events:,}")
+            print(f"Rate:          {events_per_min:.1f}/min")
+            
+            event_summary = telemetry_data.get('event_summary', {})
+            events_by_level = event_summary.get('events_by_level', {})
+            if events_by_level:
+                print("By Level:")
+                for level, count in events_by_level.items():
+                    level_icon = {
+                        'DEBUG': '🔍', 'INFO': 'ℹ️', 'WARN': '⚠️', 
+                        'ERROR': '❌', 'CRITICAL': '🚨'
+                    }.get(level, '📝')
+                    print(f"  {level_icon} {level}: {count}")
+            print()
+            
+            # Subsystem overview
+            subsystems = telemetry_data.get('integrated_subsystems', [])
+            print("🔗 INTEGRATED SUBSYSTEMS")
+            print("-" * 30)
+            if subsystems:
+                for subsystem in subsystems:
+                    print(f"  ✅ {subsystem}")
+            else:
+                print("  ⚪ No subsystems integrated")
+            print()
+            
+            # Recent events
+            recent_events = telemetry_data.get('recent_events', [])
+            print(f"🔄 RECENT EVENTS (Last {min(len(recent_events), event_count)})")
+            print("-" * 50)
+            
+            if recent_events:
+                for event in recent_events[-event_count:]:
+                    timestamp = event.get('timestamp', '')[:19]  # Remove microseconds
+                    level = event.get('level', 'INFO')
+                    subsystem = event.get('subsystem', 'unknown')
+                    component = event.get('component', 'unknown')
+                    event_type = event.get('event_type', 'unknown')
+                    
+                    level_icon = {
+                        'DEBUG': '🔍', 'INFO': 'ℹ️', 'WARN': '⚠️', 
+                        'ERROR': '❌', 'CRITICAL': '🚨'
+                    }.get(level, '📝')
+                    
+                    print(f"{timestamp} {level_icon} {subsystem}.{component}: {event_type}")
+                    
+                    # Show event data if available
+                    data = event.get('data', {})
+                    if data and isinstance(data, dict):
+                        # Show first few key data points
+                        data_items = list(data.items())[:2]
+                        for key, value in data_items:
+                            value_str = str(value)[:50]
+                            print(f"    {key}: {value_str}")
+            else:
+                print("  ⚪ No recent events")
+            
+            print()
+            
+            # Export information
+            exporters = telemetry_data.get('exporters', [])
+            if exporters:
+                print("📤 ACTIVE EXPORTERS")
+                print("-" * 20)
+                for exporter in exporters:
+                    print(f"  📄 {exporter}")
+                print()
+            
+            # Recent errors
+            recent_errors = event_summary.get('recent_errors', [])
+            if recent_errors:
+                print("❌ RECENT ERRORS")
+                print("-" * 20)
+                for error in recent_errors:
+                    error_icon = "🚨" if error['level'] == 'CRITICAL' else "❌"
+                    print(f"  {error_icon} {error['subsystem']}.{error['component']}")
+                    print(f"     {error['message']}")
+                print()
+            
+        except Exception as e:
+            print(f"❌ Error displaying telemetry: {e}")
+        
+        print("-" * 60)
+        print("🔄 Press Ctrl+C to stop monitoring")
 
 
 # Global monitor instance for signal handling
@@ -1611,14 +2472,333 @@ def signal_handler(signum, frame):
     else:
         sys.exit(0)
 
+# Callable functions for programmatic use
+def create_live_monitor(simulation_mode: bool = False, 
+                       enable_tools: bool = True, 
+                       log_directory: Optional[str] = None) -> LiveDAWNMonitor:
+    """
+    Create a live monitor instance that can be used programmatically.
+    
+    Args:
+        simulation_mode: Whether to run in simulation mode
+        enable_tools: Whether to enable tools system integration
+        log_directory: Directory for monitor logs
+        
+    Returns:
+        Configured LiveDAWNMonitor instance
+    """
+    return LiveDAWNMonitor(
+        simulation_mode=simulation_mode,
+        enable_tools=enable_tools,
+        log_directory=log_directory
+    )
+
+def start_monitoring_session(monitor: LiveDAWNMonitor, 
+                           interval: float = 0.5,
+                           duration: Optional[float] = None) -> Dict[str, Any]:
+    """
+    Start a monitoring session and return results.
+    
+    Args:
+        monitor: LiveDAWNMonitor instance
+        interval: Update interval in seconds
+        duration: Optional duration to monitor (None for indefinite)
+        
+    Returns:
+        Dictionary with monitoring session results
+    """
+    if not DAWN_AVAILABLE:
+        return {
+            'success': False,
+            'error': 'DAWN modules not available'
+        }
+    
+    import threading
+    import time
+    
+    results = {
+        'success': True,
+        'start_time': datetime.now(),
+        'data_points': [],
+        'tools_used': [],
+        'logs_created': []
+    }
+    
+    def monitoring_thread():
+        try:
+            if duration:
+                # Run for specific duration
+                end_time = time.time() + duration
+                while time.time() < end_time and monitor.running:
+                    state = monitor.get_live_state()
+                    if state:
+                        results['data_points'].append({
+                            'timestamp': datetime.now(),
+                            'state': state
+                        })
+                    time.sleep(interval)
+            else:
+                # Run indefinitely
+                monitor.start_monitoring(interval)
+        except Exception as e:
+            results['success'] = False
+            results['error'] = str(e)
+        finally:
+            results['end_time'] = datetime.now()
+            results['logs_created'] = monitor.session_logs if monitor.enable_tools else []
+    
+    # Start monitoring in background thread if duration specified
+    if duration:
+        monitor.running = True
+        thread = threading.Thread(target=monitoring_thread, daemon=True)
+        thread.start()
+        thread.join()
+    else:
+        monitoring_thread()
+    
+    return results
+
+def start_console_display(monitor: LiveDAWNMonitor, 
+                          interval: float = 0.5,
+                          compact: bool = False) -> Dict[str, Any]:
+    """
+    Start the console display for a monitor instance.
+    
+    Args:
+        monitor: LiveDAWNMonitor instance
+        interval: Update interval in seconds
+        compact: Whether to use compact display (no screen clearing)
+        
+    Returns:
+        Dictionary with console session results
+    """
+    if not DAWN_AVAILABLE:
+        return {
+            'success': False,
+            'error': 'DAWN modules not available'
+        }
+    
+    results = {
+        'success': True,
+        'start_time': datetime.now(),
+        'updates_displayed': 0,
+        'errors': []
+    }
+    
+    try:
+        monitor.start_console_display(interval, compact)
+        results['end_time'] = datetime.now()
+        results['duration'] = (results['end_time'] - results['start_time']).total_seconds()
+        
+    except KeyboardInterrupt:
+        results['end_time'] = datetime.now()
+        results['duration'] = (results['end_time'] - results['start_time']).total_seconds()
+        results['stopped_by'] = 'user_interrupt'
+        
+    except Exception as e:
+        results['success'] = False
+        results['error'] = str(e)
+        results['errors'].append(str(e))
+    
+    return results
+
+def start_simple_console_display(monitor: LiveDAWNMonitor, 
+                                 interval: float = 0.5,
+                                 compact: bool = False):
+    """
+    Simple console display that bypasses complex initialization.
+    
+    This is a fallback function that provides basic real-time display
+    without requiring full DAWN system initialization.
+    """
+    print("🖥️  DAWN Simple Console Display")
+    print("=" * 80)
+    print("Real-time view of DAWN system activity (simplified mode)")
+    if monitor.simulation_mode:
+        print("🎭 Running in SIMULATION MODE")
+    print(f"⏱️  Update interval: {interval}s")
+    print("Press Ctrl+C to stop\n")
+    
+    monitor.running = True
+    last_tick = -1
+    display_counter = 0
+    
+    try:
+        while monitor.running:
+            try:
+                # Get basic state without complex tools integration
+                state = monitor.get_live_state()
+                
+                if state is None:
+                    print("⏳ Waiting for DAWN system data...")
+                    time.sleep(interval)
+                    continue
+                
+                # Clear screen for live updates (if not compact)
+                if not compact:
+                    os.system('clear' if os.name == 'posix' else 'cls')
+                
+                # Header
+                current_time = datetime.now().strftime("%H:%M:%S")
+                print(f"🖥️  DAWN Simple Console [{current_time}] - Update #{display_counter}")
+                print("=" * 80)
+                
+                # Basic tick and phase info
+                tick_count = state.get('tick_count', 0)
+                current_phase = state.get('current_phase', 'UNKNOWN')
+                
+                if tick_count != last_tick:
+                    tick_indicator = "🔄 NEW"
+                    last_tick = tick_count
+                else:
+                    tick_indicator = "⏸️  SAME"
+                
+                print(f"⚡ Tick #{tick_count:,} | Phase: {current_phase} {tick_indicator}")
+                print(f"🕐 Cycle: {state.get('cycle_time', 0):.3f}s | Load: {state.get('processing_load', 0):.1f}%")
+                print()
+                
+                # Simple consciousness metrics
+                consciousness_level = state.get('consciousness_level', 0)
+                unity_score = state.get('unity_score', 0)
+                awareness = state.get('awareness_delta', 0)
+                
+                # Simple color coding
+                level_status = "🟢 HIGH" if consciousness_level > 0.7 else "🟡 MED" if consciousness_level > 0.4 else "🔴 LOW"
+                unity_status = "🟢 HIGH" if unity_score > 0.7 else "🟡 MED" if unity_score > 0.4 else "🔴 LOW"
+                awareness_status = "🟢 POS" if awareness > 0 else "🟡 NEU" if awareness > -0.1 else "🔴 NEG"
+                
+                print("🧠 CONSCIOUSNESS METRICS")
+                print(f"   Level:     {consciousness_level:.3f} {level_status}")
+                print(f"   Unity:     {unity_score:.3f} {unity_status}")
+                print(f"   Awareness: {awareness:+.3f} {awareness_status}")
+                
+                # SCUP if available
+                scup_value = state.get('scup_value', 0)
+                if scup_value > 0:
+                    scup_status = "🟢 HIGH" if scup_value > 0.7 else "🟡 MED" if scup_value > 0.4 else "🔴 LOW"
+                    print(f"   SCUP:      {scup_value:.3f} {scup_status}")
+                print()
+                
+                # Basic system info
+                active_modules = state.get('active_modules', 0)
+                engine_status = state.get('engine_status', 'UNKNOWN')
+                
+                print("💻 SYSTEM STATUS")
+                print(f"   Engine:    {'🟢' if engine_status == 'RUNNING' else '🟡'} {engine_status}")
+                print(f"   Modules:   📦 {active_modules} active")
+                
+                # Heat level if available
+                heat_level = state.get('heat_level', 0)
+                if heat_level > 0:
+                    heat_status = "🔴 HIGH" if heat_level > 70 else "🟡 MED" if heat_level > 40 else "🟢 LOW"
+                    print(f"   Heat:      {heat_level:.1f} {heat_status}")
+                print()
+                
+                # Simple trend info (every 10 updates)
+                if display_counter % 10 == 0 and len(monitor.history) > 3:
+                    recent_states = list(monitor.history)[-3:]
+                    if len(recent_states) >= 2:
+                        consciousness_trend = recent_states[-1].get('consciousness_level', 0) - recent_states[0].get('consciousness_level', 0)
+                        trend_indicator = "🟢 ↗️" if consciousness_trend > 0.01 else "🔴 ↘️" if consciousness_trend < -0.01 else "🟡 ➡️"
+                        print("📈 TREND (recent)")
+                        print(f"   Consciousness: {trend_indicator} {consciousness_trend:+.3f}")
+                        print()
+                
+                # Footer
+                if compact:
+                    print("-" * 80)
+                else:
+                    print("Controls: Ctrl+C to stop | Simple Console Mode")
+                    print("=" * 80)
+                
+                display_counter += 1
+                
+                # Sleep with interrupt checking
+                sleep_time = interval
+                while sleep_time > 0 and monitor.running:
+                    chunk = min(0.1, sleep_time)
+                    time.sleep(chunk)
+                    sleep_time -= chunk
+                
+            except Exception as e:
+                print(f"❌ Display error: {e}")
+                time.sleep(interval)
+                
+    except KeyboardInterrupt:
+        print("\n👋 Simple console display stopped")
+    except EOFError:
+        print("\n👋 Simple console display stopped (EOF)")
+    finally:
+        monitor.running = False
+
+def get_monitor_status(monitor: LiveDAWNMonitor) -> Dict[str, Any]:
+    """
+    Get current status of a monitor instance.
+    
+    Args:
+        monitor: LiveDAWNMonitor instance
+        
+    Returns:
+        Dictionary with current monitor status
+    """
+    status = {
+        'running': monitor.running,
+        'simulation_mode': monitor.simulation_mode,
+        'tools_enabled': monitor.enable_tools,
+        'history_size': len(monitor.history),
+        'uptime_seconds': time.time() - monitor.start_time
+    }
+    
+    if monitor.enable_tools:
+        status['tools_available'] = monitor.tools_manager is not None
+        status['logs_created'] = len(monitor.session_logs)
+        status['log_directory'] = str(monitor.log_directory)
+        
+        # Get tools system status
+        if monitor.tools_manager:
+            available_tools = monitor.tools_manager.get_available_tools(consciousness_filtered=True)
+            status['available_tools'] = len(available_tools)
+            
+            active_sessions = monitor.tools_manager.get_active_sessions()
+            status['active_tool_sessions'] = len(active_sessions)
+    
+    # Get current state if available
+    try:
+        current_state = monitor.get_live_state()
+        if current_state:
+            status['current_consciousness'] = {
+                'level': current_state.get('consciousness_level', 0),
+                'unity': current_state.get('unity', 0),
+                'awareness': current_state.get('awareness', 0),
+                'tick': current_state.get('tick', 0)
+            }
+    except Exception as e:
+        status['current_consciousness'] = {'error': str(e)}
+    
+    return status
+
 def main():
-    parser = argparse.ArgumentParser(description="DAWN Live Consciousness Monitor")
+    parser = argparse.ArgumentParser(description="DAWN Live Consciousness Monitor - Enhanced with Tools Integration")
     parser.add_argument("--interval", type=float, default=0.5,
                        help="Update interval in seconds")
     parser.add_argument("--check", action="store_true",
                        help="Check if DAWN is available")
     parser.add_argument("--simulate", action="store_true",
                        help="Run in simulation mode with generated DAWN consciousness data")
+    parser.add_argument("--telemetry-only", action="store_true",
+                       help="Show only telemetry system information")
+    parser.add_argument("--telemetry-events", type=int, default=20,
+                       help="Number of recent telemetry events to display")
+    parser.add_argument("--no-tools", action="store_true",
+                       help="Disable tools system integration")
+    parser.add_argument("--log-dir", type=str, default=None,
+                       help="Directory for monitor logs")
+    parser.add_argument("--duration", type=float, default=None,
+                       help="Run for specific duration in seconds (for programmatic use)")
+    parser.add_argument("--console", action="store_true",
+                       help="Start real-time console display mode")
+    parser.add_argument("--compact", action="store_true",
+                       help="Use compact console display (no screen clearing)")
     
     args = parser.parse_args()
     
@@ -1627,8 +2807,34 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
     
     global _monitor_instance
-    monitor = LiveDAWNMonitor(simulation_mode=args.simulate)
+    
+    # For console mode, disable tools by default to avoid initialization hangs
+    enable_tools_for_console = not args.no_tools and not args.console
+    
+    monitor = LiveDAWNMonitor(
+        simulation_mode=args.simulate,
+        enable_tools=enable_tools_for_console,
+        log_directory=args.log_dir
+    )
     _monitor_instance = monitor
+    
+    # Handle telemetry-only mode
+    if args.telemetry_only:
+        if not TELEMETRY_AVAILABLE:
+            print("❌ Telemetry system not available")
+            return 1
+        
+        try:
+            while True:
+                print("\033[2J\033[H")  # Clear screen
+                monitor.display_telemetry_only_mode(args.telemetry_events)
+                time.sleep(args.interval)
+        except KeyboardInterrupt:
+            print("\n👋 Stopping telemetry monitor...")
+            return 0
+        except Exception as e:
+            print(f"❌ Telemetry monitor error: {e}")
+            return 1
     
     if args.check:
         state = monitor.get_live_state()
@@ -1647,6 +2853,31 @@ def main():
             print(f"   Cycle: {state['cycle_time']:.3f}s")
             print(f"   SCUP: {state['scup_value']:.3f}")
             return 0
+    
+    # Handle console display mode
+    if args.console:
+        # Quick console mode that bypasses complex initialization
+        print("🖥️  DAWN Live Console Display")
+        print("=" * 80)
+        print("Starting console display...")
+        
+        try:
+            # Use a simplified console display if full initialization hangs
+            if hasattr(monitor, 'start_console_display'):
+                monitor.start_console_display(args.interval, args.compact)
+            else:
+                # Fallback simple console display
+                start_simple_console_display(monitor, args.interval, args.compact)
+        except (KeyboardInterrupt, EOFError):
+            print("\n👋 Console display stopped")
+        except Exception as e:
+            print(f"❌ Console display error: {e}")
+            print("Falling back to simple console display...")
+            try:
+                start_simple_console_display(monitor, args.interval, args.compact)
+            except (KeyboardInterrupt, EOFError):
+                print("\n👋 Simple console display stopped")
+        return 0
     
     try:
         monitor.start_monitoring(args.interval)

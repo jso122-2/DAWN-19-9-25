@@ -15,14 +15,18 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-# Add paths
-sys.path.insert(0, str(Path(__file__).parent / "dawn_core"))
+# Add DAWN root to path
+current_file = Path(__file__).resolve()
+dawn_root = current_file.parents[4]  # Go up 5 levels from the current file to get to DAWN root
+sys.path.insert(0, str(dawn_root))
 
 try:
-    from visual_consciousness import VisualConsciousnessEngine, create_consciousness_visualization
+    from dawn.subsystems.visual.visual_consciousness import VisualConsciousnessEngine
     print("✅ DAWN consciousness systems ready")
 except ImportError as e:
     print(f"❌ Failed to load consciousness systems: {e}")
+    print(f"Tried to load from: {dawn_root}")
+    print("Make sure you're running from the DAWN root directory")
     sys.exit(1)
 
 def capture_consciousness_moment(output_path: str = None, canvas_size: tuple = (1024, 768)) -> str:

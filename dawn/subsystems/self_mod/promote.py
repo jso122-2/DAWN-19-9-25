@@ -24,11 +24,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from dawn_core.state import get_state, set_state
-from dawn_core.snapshot import snapshot
-from dawn_core.self_mod.advisor import ModProposal
-from dawn_core.self_mod.patch_builder import PatchResult
-from dawn_core.self_mod.policy_gate import GateDecision
+from dawn.core.foundation.state import get_state, set_state
+from dawn.subsystems.visual.snapshot import snapshot
+from dawn.subsystems.self_mod.advisor import ModProposal
+from dawn.subsystems.self_mod.patch_builder import PatchResult
+from dawn.subsystems.self_mod.policy_gate import GateDecision
 
 logger = logging.getLogger(__name__)
 
@@ -245,17 +245,14 @@ class ConsciousnessModificationPromoter:
             record.error_message = "Patch was not successfully applied"
             return False
         
-        # Determine target file
-        sandbox_file = pathlib.Path(patch_result.sandbox_dir) / patch_result.target_rel
-        if not sandbox_file.exists():
-            record.error_message = f"Sandbox file not found: {sandbox_file}"
+        # Comprehensive file validation
+        file_validation = self._validate_promotion_files(patch_result, record)
+        if not file_validation['valid']:
+            record.error_message = file_validation['reason']
             return False
         
-        # Determine live target file
-        live_file = pathlib.Path(patch_result.target_rel)
-        if not live_file.exists():
-            record.error_message = f"Live target file not found: {live_file}"
-            return False
+        sandbox_file = file_validation['sandbox_file']
+        live_file = file_validation['live_file']
         
         record.target_files = [str(live_file)]
         
@@ -280,6 +277,174 @@ class ConsciousnessModificationPromoter:
         except Exception as e:
             record.error_message = f"Promotion execution failed: {str(e)}"
             return False
+    
+    def _validate_promotion_files(self, patch_result: PatchResult, record: PromotionRecord) -> Dict[str, Any]:
+        """
+        Comprehensively validate files needed for promotion.
+        
+        Args:
+            patch_result: Results from patch application
+            record: Promotion record for logging
+            
+        Returns:
+            Dict with validation results
+        """
+        logger.debug(f"🔍 Validating promotion files for {patch_result.target_rel}")
+        
+        # Check sandbox file
+        sandbox_file = pathlib.Path(patch_result.sandbox_dir) / patch_result.target_rel
+        if not sandbox_file.exists():
+            # Try alternative sandbox file locations
+            alt_sandbox_paths = [
+                pathlib.Path(patch_result.sandbox_dir) / pathlib.Path(patch_result.target_rel).name,
+                pathlib.Path(patch_result.sandbox_dir) / "modified" / patch_result.target_rel,
+                pathlib.Path(patch_result.sandbox_dir) / "patched" / patch_result.target_rel,
+            ]
+            
+            sandbox_found = False
+            for alt_path in alt_sandbox_paths:
+                if alt_path.exists():
+                    logger.info(f"🔍 Found sandbox file at alternative location: {alt_path}")
+                    sandbox_file = alt_path
+                    sandbox_found = True
+                    break
+            
+            if not sandbox_found:
+                search_locations = [str(sandbox_file)] + [str(p) for p in alt_sandbox_paths]
+                return {
+                    'valid': False,
+                    'reason': f"Sandbox file not found. Searched: {search_locations}",
+                    'sandbox_file': None,
+                    'live_file': None
+                }
+        
+        # Validate sandbox file accessibility
+        try:
+            if not sandbox_file.is_file():
+                return {
+                    'valid': False,
+                    'reason': f"Sandbox path exists but is not a file: {sandbox_file}",
+                    'sandbox_file': None,
+                    'live_file': None
+                }
+            
+            # Check if sandbox file is readable
+            with open(sandbox_file, 'r', encoding='utf-8') as f:
+                f.read(100)  # Test read
+                
+        except PermissionError:
+            return {
+                'valid': False,
+                'reason': f"Sandbox file exists but is not readable: {sandbox_file}",
+                'sandbox_file': None,
+                'live_file': None
+            }
+        except Exception as e:
+            return {
+                'valid': False,
+                'reason': f"Error accessing sandbox file {sandbox_file}: {e}",
+                'sandbox_file': None,
+                'live_file': None
+            }
+        
+        # Check live target file
+        live_file = pathlib.Path(patch_result.target_rel)
+        if not live_file.exists():
+            # Try alternative live file locations (similar to patch_builder)
+            alt_live_paths = self._get_alternative_live_paths(patch_result.target_rel)
+            
+            live_found = False
+            for alt_path in alt_live_paths:
+                if alt_path.exists():
+                    logger.info(f"🔍 Found live file at alternative location: {alt_path}")
+                    live_file = alt_path
+                    live_found = True
+                    break
+            
+            if not live_found:
+                search_locations = [str(live_file)] + [str(p) for p in alt_live_paths]
+                return {
+                    'valid': False,
+                    'reason': f"Live target file not found. Searched: {search_locations}",
+                    'sandbox_file': None,
+                    'live_file': None
+                }
+        
+        # Validate live file accessibility
+        try:
+            if not live_file.is_file():
+                return {
+                    'valid': False,
+                    'reason': f"Live path exists but is not a file: {live_file}",
+                    'sandbox_file': None,
+                    'live_file': None
+                }
+            
+            # Check if live file is readable and writable
+            with open(live_file, 'r', encoding='utf-8') as f:
+                f.read(100)  # Test read
+            
+            # Test write permission by checking parent directory
+            if not os.access(live_file.parent, os.W_OK):
+                return {
+                    'valid': False,
+                    'reason': f"Live file directory is not writable: {live_file.parent}",
+                    'sandbox_file': None,
+                    'live_file': None
+                }
+                
+        except PermissionError:
+            return {
+                'valid': False,
+                'reason': f"Live file exists but is not accessible: {live_file}",
+                'sandbox_file': None,
+                'live_file': None
+            }
+        except Exception as e:
+            return {
+                'valid': False,
+                'reason': f"Error accessing live file {live_file}: {e}",
+                'sandbox_file': None,
+                'live_file': None
+            }
+        
+        logger.debug(f"✅ File validation successful for promotion")
+        return {
+            'valid': True,
+            'reason': "All files exist and are accessible",
+            'sandbox_file': sandbox_file,
+            'live_file': live_file
+        }
+    
+    def _get_alternative_live_paths(self, target_path: str) -> List[pathlib.Path]:
+        """Get alternative paths for live files, similar to patch_builder logic."""
+        alternatives = []
+        original_path = pathlib.Path(target_path)
+        
+        # Common path transformations for DAWN system
+        if 'dawn_core' in target_path:
+            # Try the new dawn/core/foundation structure
+            new_path = target_path.replace('dawn_core', 'dawn/core/foundation')
+            alternatives.append(pathlib.Path(new_path))
+        
+        # If path contains dawn/, try with dawn_core/
+        if 'dawn/' in target_path and 'dawn_core' not in target_path:
+            legacy_path = target_path.replace('dawn/', 'dawn_core/')
+            alternatives.append(pathlib.Path(legacy_path))
+        
+        # Try in common directories
+        filename = original_path.name
+        common_dirs = [
+            pathlib.Path("dawn/core/foundation"),
+            pathlib.Path("dawn_core"),
+            pathlib.Path("dawn/subsystems"),
+        ]
+        
+        for common_dir in common_dirs:
+            if common_dir.exists():
+                alternatives.append(common_dir / filename)
+        
+        return alternatives
     
     def _copy_and_reload_promotion(self, sandbox_file: pathlib.Path, 
                                   live_file: pathlib.Path, record: PromotionRecord) -> bool:
@@ -388,7 +553,7 @@ class ConsciousnessModificationPromoter:
         # Map file paths to module names
         file_to_module_map = {
             'dawn_core/tick_orchestrator.py': 'dawn_core.tick_orchestrator',
-            'dawn_core/state.py': 'dawn_core.state',
+            'dawn/core/foundation/state.py': 'dawn.core.foundation.state',
             'dawn_core/consciousness_bus.py': 'dawn_core.consciousness_bus',
             'dawn_core/unified_consciousness_main.py': 'dawn_core.unified_consciousness_main'
         }
@@ -625,9 +790,9 @@ def demo_promotion_system():
     print(f"💾 Backup Directory: {promoter.backup_dir}")
     
     # Mock data for demonstration
-    from dawn_core.self_mod.advisor import ModProposal, PatchType, ModificationPriority
-    from dawn_core.self_mod.patch_builder import PatchResult, PatchStatus
-    from dawn_core.self_mod.policy_gate import GateDecision, GateStatus
+    from dawn.subsystems.self_mod.advisor import ModProposal, PatchType, ModificationPriority
+    from dawn.subsystems.self_mod.patch_builder import PatchResult, PatchStatus
+    from dawn.subsystems.self_mod.policy_gate import GateDecision, GateStatus
     
     # Create mock proposal
     mock_proposal = ModProposal(
